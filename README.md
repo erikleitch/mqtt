@@ -1,7 +1,7 @@
-##`mqtt` - A simple Erlang MQTT client NIF##
+## `mqtt` - A simple Erlang MQTT client NIF
 
 <hr>
-###What is mqtt?###
+### What is mqtt?
 
 ```mqtt``` is a NIF library that provides a simple interface to an
 embedded C++ mosquitto client (see
@@ -10,7 +10,7 @@ client that can be run stand-alone in either an erlang or C++ context,
 or embedded in another erlang process.
 
 <hr>
-###Compiling###
+### Compiling
 
 The ```mqtt``` module is built on top of the mosquitto client library,
 and requires the following environment variables to be defined:
@@ -24,7 +24,7 @@ With those defined, you should just be able to type `make`.
 
 * MQTT_USE_LEVELDB
 <hr>
-###Riak Usage###
+### Riak Usage
 
 At its most basic, the ```mqtt``` module exports a single-point
 interface for use within RiakTS.  Executing the function
@@ -39,7 +39,7 @@ codebase causes two things to happen:
   subscribes to two default topics, each corresponding to a TS table: ```DeviceData``` and ```GeoCheckin```, assumed to have the schema ```[sint64, timestamp, sint64]``` and ```[varchar, varchar, timestamp, sint64, varchar, double, boolean]```, respectively.
 
 <hr>
-###Manual Usage###
+### Manual Usage
 
 Additionally, the module exports a simple command interface, ```mqtt:command(CommandTuple)``` for
 manual testing/manipulation of the client.
@@ -88,7 +88,7 @@ Recognized commands are:
      * Toggle logging of incoming messages (to stdout/riak log)
 
 <hr>
-###Example
+### Example
 
 Suppose you've previously started a mosquitto broker, as in:
 
