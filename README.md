@@ -1,6 +1,7 @@
 # `mqtt` - A simple Erlang MQTT client NIF
 
 <hr>
+
 ## What is mqtt?
 
 ```mqtt``` is a NIF library that provides a simple interface to an
@@ -10,6 +11,7 @@ client that can be run stand-alone in either an erlang or C++ context,
 or embedded in another erlang process.
 
 <hr>
+
 ## Compiling
 
 The ```mqtt``` module is built on top of the mosquitto client library,
