@@ -90,22 +90,32 @@ leveldb_clean()
 
 leveldb_make()
 {
+    echo "Inside leveldb_make 0"
+    
     if [ ! -d snappy-$SNAPPY_VSN ]; then
 	tar -xzf snappy-$SNAPPY_VSN.tar.gz
 	(cd snappy-$SNAPPY_VSN && ./configure --prefix=$BASEDIR/system --libdir=$BASEDIR/system/lib --with-pic)
     fi
+
+    echo "Inside leveldb_make 1"
     
     if [ ! -f system/lib/libsnappy.a ]; then
 	(cd snappy-$SNAPPY_VSN && $MAKE && $MAKE install)
     fi
+
+    echo "Inside leveldb_make 2"
     
     export CFLAGS="$CFLAGS -I $BASEDIR/system/include"
     export CXXFLAGS="$CXXFLAGS -I $BASEDIR/system/include"
     export LDFLAGS="$LDFLAGS -L$BASEDIR/system/lib"
     export LD_LIBRARY_PATH="$BASEDIR/system/lib:$LD_LIBRARY_PATH"
     export LEVELDB_VSN="$LEVELDB_VSN"
+
+    echo "Inside leveldb_make 3"
     
     leveldb_get_deps
+
+    echo "Inside leveldb_make 4"
     
     # hack issue where high level make is running -j 4
     #  and causes build errors in leveldb
@@ -180,9 +190,16 @@ mqtt_cc_make()
     LIBCC=`echo [A-Z]*.cc`
     LIBOBJ=`echo [A-Z]*.o`
 
-    MQTT_DEF_FLAGS="-DWITH_ERL=0 -DWITH_LEVELDB=$MQTT_USE_LEVELDB"
+    if [ ${MQTT_USE_LEVELDB:-0} == 0 ]; then
+	MQTT_LIBS="-L$MQTT_LIB_DIR -lmosquitto -lpthread"
+    else
+	MQTT_LIBS="-L$MQTT_LIB_DIR -lmosquitto $ROOTDIR/c_src/leveldb/libleveldb.a -L$ROOTDIR/c_src/system/lib -lsnappy -lpthread"
+    fi
+    
+    MQTT_DEF_FLAGS="-DWITH_ERL=0 -DWITH_LEVELDB=${MQTT_USE_LEVELDB:-0}"
     MQTT_INC_FLAGS="-I leveldb/include -I $MQTT_INC_DIR"
-    MQTT_LIBS="-L$MQTT_LIB_DIR -lmosquitto $ROOTDIR/c_src/leveldb/libleveldb.a -L$ROOTDIR/c_src/system/lib -lsnappy -lpthread"
+
+    echo "Def flags = $MQTT_DEF_FLAGS"
 
     case "$TARGET_OS" in
 	Darwin)
@@ -251,7 +268,7 @@ case "$1" in
     #------------------------------------------------------------
     
     get-deps)
-	if [ $MQTT_USE_LEVELDB == "1" ]; then
+	if [ ${MQTT_USE_LEVELDB:-0} == 1 ]; then
 	    leveldb_get_deps;
 	    snappy_get_deps;
 	fi
@@ -281,8 +298,8 @@ case "$1" in
 	fi
 	
 	# Build leveldb if using leveldb
-	
-	if [ $MQTT_USE_LEVELDB == "1" ]; then
+
+	if [ ${MQTT_USE_LEVELDB:-0} == 1 ]; then
 	    leveldb_make;
 	fi
 
@@ -298,8 +315,8 @@ case "$1" in
     
     *)
 	# Build leveldb if using leveldb
-	
-	if [ $MQTT_USE_LEVELDB == "1" ]; then
+
+	if [ ${MQTT_USE_LEVELDB:-0} == 1 ]; then
 	    leveldb_make;
 	fi
 

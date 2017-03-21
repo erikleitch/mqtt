@@ -1,9 +1,5 @@
 # `mqtt` - A simple Erlang MQTT client NIF
 
-<hr>
-
-## What is mqtt?
-
 ```mqtt``` is a NIF library that provides a simple interface to an
 embedded C++ mosquitto client (see
 https://github.com/eclipse/mosquitto).  The repo provides a simple

@@ -10,7 +10,7 @@ cpponly:
 get-deps:
 	./c_src/build_deps.sh get-deps
 
-deps:
+deps: get-deps
 	${REBAR} get-deps
 
 rm-deps:
