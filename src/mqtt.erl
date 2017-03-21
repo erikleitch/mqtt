@@ -19,9 +19,17 @@
 
 -module(mqtt).
 
--export([command/1, startCommsLoopRiak/0, startCommsLoopRiak/1, startCommsLoopRiakAlex/0, startCommsLoopNoneAlex/0, startCommsLoopNone/0, startCommsLoopFake/0]).
+-export([command/1, 
+	 startCommsLoop/2, 
+	 startCommsLoop/3, 
+	 startCommsLoopRiak/0, 
+	 startCommsLoopRiak/1, 
+	 startCommsLoopRiakAlex/0, 
+	 startCommsLoopNoneAlex/0, 
+	 startCommsLoopNone/0, 
+	 startCommsLoopFake/0]).
 
--compile(export_all).
+-compile([export_all]).
 
 -on_load(init/0).
 
@@ -205,6 +213,12 @@ getCurrentTables(ModList, OldSchemaSet) ->
 %% Communication loop framework
 %%=======================================================================
 
+startCommsLoop([], CallbackFn, StartScanner) ->
+    startCommsLoop(CallbackFn, StartScanner);
+startCommsLoop(OptList, CallbackFn, StartScanner) ->
+    mqtt:command(OptList),
+    startCommsLoop(CallbackFn, StartScanner).
+
 startCommsLoop(CallbackFn, true) ->
     spawnClient(),
     spawnScanner(),
@@ -219,12 +233,11 @@ startCommsLoop(CallbackFn, false) ->
 %%-----------------------------------------------------------------------
 
 startCommsLoopRiak() ->
-    startCommsLoop(fun mqtt:sendKvMsg/1, false).
+    startCommsLoop([], fun mqtt:sendKvMsg/1, false).
 
 startCommsLoopRiak(OptList) ->
-    mqtt:command(OptList),
-    startCommsLoop(fun mqtt:sendKvMsg/1, false).
-
+    startCommsLoop(OptList, fun mqtt:sendKvMsg/1, false).
+    
 startCommsLoopRiakAlex() ->
     startCommsLoopRiak([
 			{host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
@@ -258,17 +271,17 @@ startCommsLoopNone() ->
 %%-----------------------------------------------------------------------
 
 startCommsLoopNoneAlex() ->
-    mqtt:command([{host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
-		  {port,     8883},
-		  {capath,   "/Users/eml/projects/mqtt/alexpi"},
-		  {cafile,   "root-CA.crt"},
-		  {certfile, "riak-sink.cert.pem"},
-		  {keyfile,  "riak-sink.private.key"}]),
-    startCommsLoop(fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
+    OptList = [{host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
+	       {port,     8883},
+	       {capath,   "/Users/eml/projects/mqtt/alexpi"},
+	       {cafile,   "root-CA.crt"},
+	       {certfile, "riak-sink.cert.pem"},
+	       {keyfile,  "riak-sink.private.key"}],
+    startCommsLoop(OptList, fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
 
 %%-----------------------------------------------------------------------
 %% Test comms loop that forwards a fake TS message for every received
-%% message.   Used only for testing
+%% message. Used only for testing
 %%-----------------------------------------------------------------------
 
 startCommsLoopFake() ->

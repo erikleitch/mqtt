@@ -117,10 +117,11 @@ void MosClient::initAndRun()
     if(!embedded_) {
         std::string dbName_ = "/tmp/" + name_;
         db_.open(dbName_);
-        commandTopic_ = name_ + "/command";
     }
 #endif
-    
+
+    commandTopic_ = name_ + "/command";
+
     //------------------------------------------------------------
     // Initialize timeout to 0, which will cause select to exit immediately
     //------------------------------------------------------------
@@ -688,8 +689,10 @@ void MosClient::subscribePrivate(std::string topic, std::string schema, std::vec
     int qos    = 0;
     int retVal = 0;
 
-    if(connected_)
+    if(connected_) {
+        COUT("Here 0");
         retVal = mosquitto_subscribe(mosq_, NULL, topic.c_str(), qos);
+    }
     
     // And add a map entry with the schema conversion fns
     
@@ -804,10 +807,10 @@ void MosClient::processCommand(const struct mosquitto_message *message)
         
         if(connected_) {
 
-            if(entryMap.find("topic") == entryMap.end())
-                ThrowRuntimeError("No topic was specified");
+            std::string topic = getEntry(entryMap, "topic");
             
             int retVal = mosquitto_subscribe(mosq_, NULL, entryMap["topic"].c_str(), 0);
+
             if(retVal != MOSQ_ERR_SUCCESS)
                 ThrowRuntimeError(formatMosError(retVal));
         }
@@ -818,7 +821,8 @@ void MosClient::processCommand(const struct mosquitto_message *message)
         
     } else if(command == "logging") {
 
-        std::string value = entryMap["value"];
+        std::string value = getEntry(entryMap, "value");
+
         if(value == "on" || value == "true")
             log_ = true;
         else
@@ -837,18 +841,45 @@ void MosClient::processCommand(const struct mosquitto_message *message)
     }
 }
 
+std::string MosClient::getEntry(std::map<std::string, std::string>& entryMap, std::string entry)
+{
+    if(entryMap.find(entry) == entryMap.end())
+        ThrowRuntimeError("No entry: " << entry << " found in map");
+
+    return entryMap[entry];
+}
+
+std::string MosClient::getEntry(std::map<std::string, std::string>& entryMap, std::string entry, std::string defVal)
+{
+    if(entryMap.find(entry) == entryMap.end()) {
+        
+        if(log_)
+            COUT("No entry: " << entry << " found in map.  Defaulting to: " << defVal);
+
+        return defVal;
+        
+    } else {
+        return entryMap[entry];
+    }
+}
+
 /**.......................................................................
  * Dump stored messages to a specified broker
  */
 void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
 {
+#if WITH_LEVELDB
     struct mosquitto* mosq = mosquitto_new(NULL, true, this);
 
     if(!mosq)
         ThrowRuntimeError("Error allocating new mos session");
 
     int retVal=0;
-    retVal = mosquitto_connect(mosq, entryMap["host"].c_str(), toInt(entryMap["port"]), keepAlive_);
+    std::string host = getEntry(entryMap, "host", "localhost");
+    int port         = toInt(getEntry(entryMap, "port",    "1883"));
+    unsigned delayms = toInt(getEntry(entryMap, "delayms", "0"));
+                             
+    retVal = mosquitto_connect(mosq, host.c_str(), port, keepAlive_);
 
     if(retVal != MOSQ_ERR_SUCCESS) {
         mosquitto_destroy(mosq);
@@ -859,6 +890,7 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
 
     try {
         db_.iterStart();
+        
         std::string levelKey, levelVal;
         while(db_.iterValid()) {
             db_.iterGet(levelKey, levelVal);
@@ -871,19 +903,30 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
                 std::string bucket  = levelKey.substr(0, idx);
                 std::string key     = levelKey.substr(idx+1, levelKey.size() - (idx+1));
                 
-                // Re-publish on our message queue (normally this would be another message queue, but POC)
+                // Re-publish on the specified message queue
                 
-                if(connected_) {
-                    int retVal = mosquitto_publish(mosq, NULL, bucket.c_str(), levelVal.size(), &levelVal[0], 0, false);
-                    if(retVal != MOSQ_ERR_SUCCESS)
-                        ThrowRuntimeError(formatMosError(retVal));
+                int retVal = mosquitto_publish(mosq, NULL, bucket.c_str(), levelVal.size(), &levelVal[0], 0, false);
 
-                    if(log_)
-                        COUTGREEN("Published Bucket = " << bucket << " Key = '" << key << "' Val = '" << levelVal << "'");
+                if(retVal != MOSQ_ERR_SUCCESS)
+                    ThrowRuntimeError(formatMosError(retVal));
+
+                if(log_)
+                    COUTGREEN("Published Bucket = " << bucket << " Key = '" << key << "' Val = '" << levelVal << "'");
+
+                // Delay between publishing, if requested
+                
+                if(delayms > 0) {
+                    struct timespec delay;
+                    delay.tv_sec  = delayms/1000;
+                    delay.tv_nsec = (delayms % 1000);
+
+                    nanosleep(&delay, 0);
                 }
             }
+            
             db_.iterStep();
         }
+        
         db_.iterClose();
 
     } catch(std::runtime_error& err) {
@@ -894,6 +937,7 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
 
     mosquitto_destroy(mosq);
     db_.iterClose();
+#endif
 }
 
 /**.......................................................................
@@ -1043,26 +1087,27 @@ void MosClient::addSubscribeList(struct mosquitto *mosq)
     ScopedLock(mutex_);
     
     // Subscribe to any topics that have been requested
-    
+
+    #if 0
     if(!topicList_.empty()) {
         for(std::list<std::string>::iterator iter=topicList_.begin();
             iter != topicList_.end(); iter++) {
 
-            COUT("MQTT Subscribing to topic " << *iter);
+            COUT("MQTT Subscribing to topic " << (*iter).c_str());
 
+            COUT("Here 2");
             int retVal = mosquitto_subscribe(mosq, NULL, (*iter).c_str(), 0);
             if(retVal != MOSQ_ERR_SUCCESS)
                 ThrowRuntimeError(formatMosError(retVal));
         }
     }
-
+#endif
     // If running standalone, subscribe to name/command topic too
 
-    if(!embedded_) {
-        int retVal = mosquitto_subscribe(mosq, NULL, commandTopic_.c_str(), 0);
-        if(retVal != MOSQ_ERR_SUCCESS)
-            ThrowRuntimeError(formatMosError(retVal));
-    }
+    COUT("Here 3 : " << commandTopic_);
+    int retVal = mosquitto_subscribe(mosq, NULL, commandTopic_.c_str(), 0);
+    if(retVal != MOSQ_ERR_SUCCESS)
+        ThrowRuntimeError(formatMosError(retVal));
 }
 
 /**.......................................................................

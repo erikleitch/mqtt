@@ -168,6 +168,9 @@ namespace nifutil {
         int toInt(std::string str);
         void dumpToBroker(std::map<std::string, std::string>& entryMap);
 
+        std::string getEntry(std::map<std::string, std::string>& entryMap, std::string entry);
+        std::string getEntry(std::map<std::string, std::string>& entryMap, std::string defVal, std::string entry);
+
 #if WITH_ERL
         //------------------------------------------------------------
         // The private NIF interface to this class

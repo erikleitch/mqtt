@@ -18,11 +18,89 @@ file
 
 * MQTT_LIB_DIR pointing to the installation of the libmosquitto library
 
-With those defined, you should just be able to type `make`.
+With those defined, you should just be able to type `make`.  The
+default rules will create the executable `bin/tMqtt` which trivially
+spawns a stand-alone C++ client, and `ebin/mqtt.beam`, which provides
+an erlang interface to the client library.
 
-* MQTT_USE_LEVELDB
+Additionally, both the erlang and C++ standalone versions support a
+leveldb backing store, if compiled with environment variable
+MQTT_USE_LEVELDB set to 1.  In this case, leveldb and snappy
+libraries will be built when `make` is invoked.
+
 <hr>
-## Riak Usage
+
+## Stand-alone usage
+
+At its most basic, both `bin/tMqtt` and `mqtt:spawnClient()` spawn a
+client that connects to a default broker running on localhost.  On
+startup, the clients subscribe to a special command topic, by default
+called: `mosclient/command`.  JSON-formatted MQTT messages sent to
+this topic of the form `{command:cmdname, arg1:val1, arg2:val2,...}`
+are processed internally as commands.
+
+For example, to tell the default client to subscribe to a new topic `newtopic`:
+
+```
+mosquitto_pub -t "mosclient/command" -m "{command:subscribe, topic:newtopic}"
+```
+
+Messages subsequently sent to `newtopic` will be processed by the
+client.
+
+If using with leveldb, CSV messages of the form `"key, content"` will
+be stored in a leveldb instance, indexed by key. 
+
+If messages are being stored, you can replay them to another broker by
+sending a message like:
+
+```
+mosquitto_pub -t "mosclient/command" -m "{command:dump, host:localhost, port:1884, delayms:1}"
+```
+
+this would cause stored messages to be replayed to a local broker
+listening on port 1884, with a 1-ms delay between publishing each key
+(some brokers cannot be published to as fast as clients can write).
+
+## Stand-alone erlang usage
+
+The erlang module supports additional functionality that lets you
+configure the startup connection to the broker, via the
+`mqtt:command/1` interface.  This can take a tuple of `{param, value}`
+pairs, or a list of such tuples.
+
+For example:
+
+```
+mqtt:command([
+     {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
+     {port,     8883},
+     {capath,   "/path/to/my/cert/files"},
+     {cafile,   "root-CA.crt"},
+     {certfile, "riak-sink.cert.pem"},
+     {keyfile,  "riak-sink.private.key"}
+]).
+```
+
+would configure the module to establish a connection to point to a host in AWS at
+port 8883, with relevant security, when `mqtt:spawnClient()` is called.
+
+The command interface gives you complete control over the client
+behavior, including subscribing to topics:
+
+```
+mqtt:command({subscribe, "temperatures", [varchar,double,timestamp,varchar], json})
+```
+
+or even starting the client:
+
+```
+mqtt:command({start}).
+```
+
+Type `mqtt:command({help})` for a list of functions the module supports.
+
+## Embedded erlang Usage
 
 At its most basic, the ```mqtt``` module exports a single-point
 interface for use within RiakTS.  Executing the function
