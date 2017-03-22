@@ -140,16 +140,19 @@ Recognized commands are:
        
        * Topic  -- topic name (i.e., ```"DeviceData" ```)
        * Schema -- schema (list of valid type atoms, like ```[varchar, double, timestamp]```)
-           If specified, the client will attempt to format csv or json
+
+       	   If specified, the client will attempt to format csv or json
            fields (see below) to match the specified type when
            processing MQTT messages.
+	   
        * Format -- atom (```csv``` or ```json```), optional (defaults to ```csv```)
-	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
+
+       	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
 	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
         For example use:
  
-           ```mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})```
+           `mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})`
 
            to subscribe to topic GeoCheckin, whose messages are
            expected to be of the format: `"mystring, 100012, 3, 1.234,
@@ -178,15 +181,15 @@ Recognized commands are:
 
       For example:
 
-```mqtt:command([
-        {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
-        {port,     8883},
-        {capath,   "/path/to/my/cert/files"},
-        {cafile,   "root-CA.crt"},
-        {certfile, "riak-sink.cert.pem"},
-        {keyfile,  "riak-sink.private.key"}
-   ]).
-```
+         `mqtt:command([
+            {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
+            {port,     8883},
+            {capath,   "/path/to/my/cert/files"},
+            {cafile,   "root-CA.crt"},
+            {certfile, "riak-sink.cert.pem"},
+            {keyfile,  "riak-sink.private.key"}
+          ]).`
+
 
       would configure the module to establish a connection to point to
       a host in AWS at port 8883, with relevant security, when
