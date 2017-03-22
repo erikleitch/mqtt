@@ -103,66 +103,96 @@ Type `mqtt:command({help})` for a list of functions the module supports.
 
 ## Embedded erlang Usage
 
-At its most basic, the ```mqtt``` module exports a single-point
-interface for use within RiakTS.  Executing the function
-```mqtt:startCommsLoopRiak()``` at any (single) point in the Riak
-codebase causes two things to happen:
+At its most basic, the mqtt module allows you to spawn an MQTT client
+in erlang, and register to be notified when messages arrive on any
+subscribed topics.
 
-* It spawns a background C++ thread that establishes a link to a local
-  MQTT broker, assumed to be listening on port 1883.
+For example,`mqtt:spawnClient/0` spawns a client that connects to a
+default broker running on localhost, and `mqtt:spawnListener/1` allows
+you to register a callback function that is called when messages
+arrive on subscribed tpoics.
 
-* It spawns a background erlang process that blocks on receipt of MQTT
-  messages from the C++ client thread.  When spawned, the process
-  subscribes to two default topics, each corresponding to a TS table: ```DeviceData``` and ```GeoCheckin```, assumed to have the schema ```[sint64, timestamp, sint64]``` and ```[varchar, varchar, timestamp, sint64, varchar, double, boolean]```, respectively.
+These functions are built on top of a single-point command interface
+```mqtt:command(CommandTuple)```, provided by the NIF for manipulation
+of the client.
 
-<hr>
-## Manual Usage
-
-Additionally, the module exports a simple command interface, ```mqtt:command(CommandTuple)``` for
-manual testing/manipulation of the client.
-
-The single argument is either a tuple of ```{CommandAtom, OptionalVal1, OptionalVal2,...}```, _or_ a list of such command tuples.
+The single argument is either a tuple of ```{CommandAtom,
+OptionalVal1, OptionalVal2,...}```, _or_ a list of such command
+tuples.
 
 Recognized commands are:
 
+   * ```{logging, on|off}```
+
+     * Toggle client logging (to stdout)
+
    * ```{subscribe, Topic, Schema, Format}```
+
+       Adds a new topic to the list of topics the client should
+       subscribe to.  In the context of TS, topic corresponds directly
+       to a TS table name, and the Schema to the schema for that
+       table.  This schema will be used to encode the string data
+       received from the MQTT broker before handing back to the erlang
+       layer, and consists of a list of TS table field types, in
+       order.
 
        Arguments are:
        
        * Topic  -- topic name (list, i.e., ```"DeviceData" ```)
-       * Schema -- schema (list of valid TS type atoms, like ```[varchar, double, timestamp]```)
+       * Schema -- schema (list of valid type atoms, like ```[varchar, double, timestamp]```)
+
+           If specified, the client will attempt to format csv or json
+           fields (see below) to match the specified type when
+           processing MQTT messages.
+	   
        * Format -- atom (```csv``` or ```json```), optional (defaults to ```csv```)
 	
 	   If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
 	   If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
-    Adds a new topic to the list of topics the client should subscribe
-    to.  In the context of TS, topic corresponds directly to a TS
-    table name, and the Schema to the schema for that table.  This
-    schema will be used to encode the string data received from the
-    MQTT broker before handing back to the erlang layer, and consists
-    of a list of TS table field types, in order.
-
-    For example: to subscribe to data for TS table GeoCheckin, use:
+    For example use:
  
-      ```mqtt:command({subscribe, "GeoCheckin", [varchar, varchar, timestamp, sint64, double, boolean]})```
+      ```mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})```
+
+    to subscribe to topic GeoCheckin, whose messages are expected to be of the format: `"mystring, 100012, 3, 1.234, false"`
 
    * ```{register}```
 
-     * Registers the calling process to be notified when messages
-      are received from the broker on any of the subscribed topics
+     * Registers the calling process to be notified when messages are
+       received from the broker on any of the subscribed topics.  If a
+       schema was supplied when subscribing, the fields will be
+       formatted appropriately when the calling process is notified.
+       Else they will be strings.
 
    * ```{start}```
 
-     * Starts up the background MQTT client (should be called only once)
+     * Starts up the background MQTT client (this should be called only once)
 
    * ```{status}```
 
      * Print (and return) a status summary for the MQTT client
 
-   * ```{logging, on|off}```
+   * ```{Option, Value}```
+   
+     * Configure the startup connection to the broker, by supplying an
+       appropriate `{Option, Value}` tuple
 
-     * Toggle logging of incoming messages (to stdout/riak log)
+      For example:
+
+```
+      mqtt:command([
+        {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
+        {port,     8883},
+        {capath,   "/path/to/my/cert/files"},
+        {cafile,   "root-CA.crt"},
+        {certfile, "riak-sink.cert.pem"},
+        {keyfile,  "riak-sink.private.key"}
+   ]).
+```
+
+     would configure the module to establish a connection to point to
+     a host in AWS at port 8883, with relevant security, when
+     `mqtt:spawnClient()` is called.
 
 <hr>
 ### Example

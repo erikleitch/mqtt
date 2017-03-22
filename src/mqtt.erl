@@ -98,8 +98,6 @@ command(_Tuple) ->
 %%=======================================================================
 
 spawnClient() ->
-    command({subscribe, "DeviceData", [sint64, timestamp, sint64], csv}),
-    command({subscribe, "temperatures", [varchar,double,timestamp,varchar], json}),
     command({start}).
 
 %%=======================================================================
