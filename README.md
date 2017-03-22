@@ -151,7 +151,7 @@ Recognized commands are:
 
         For example use:
 
-           `mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})`
+	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
 
         to subscribe to topic GeoCheckin, whose messages are expected
         to be of the format: "mystring, 100012, 3, 1.234, false"
