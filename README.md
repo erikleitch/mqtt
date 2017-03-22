@@ -98,6 +98,7 @@ or even starting the client:
 mqtt:command({start}).
 ```
 
+(`mqtt:spawnClient()` is just a wrapper around some of these commands)
 Type `mqtt:command({help})` for a list of functions the module supports.
 
 ## Embedded erlang Usage

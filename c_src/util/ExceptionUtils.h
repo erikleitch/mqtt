@@ -38,7 +38,7 @@
 #define COUT(text) {                                                    \
         std::ostringstream _macroOs;                                    \
         _macroOs << text;                                               \
-        std::cout << '\r' << _macroOs.str() << std::endl << "\r";       \
+        std::cout << '\r' << _macroOs.str() << std::endl << '\r' << std::endl; \
     }
 
 #define COUTRED(text) {                                                 \
@@ -50,7 +50,7 @@
 #define COUTGREEN(text) {                                               \
         std::ostringstream _macroOs;                                    \
         _macroOs << GREEN << text << NORM;                              \
-        std::cout << '\r' << _macroOs.str() << '\r' << std::endl;       \
+        std::cout << '\r' << _macroOs.str() << std::endl;               \
     }
 
 #define FOUT(text) {                                                    \

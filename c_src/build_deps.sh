@@ -90,33 +90,23 @@ leveldb_clean()
 
 leveldb_make()
 {
-    echo "Inside leveldb_make 0"
-    
     if [ ! -d snappy-$SNAPPY_VSN ]; then
 	tar -xzf snappy-$SNAPPY_VSN.tar.gz
 	(cd snappy-$SNAPPY_VSN && ./configure --prefix=$BASEDIR/system --libdir=$BASEDIR/system/lib --with-pic)
     fi
 
-    echo "Inside leveldb_make 1"
-    
     if [ ! -f system/lib/libsnappy.a ]; then
 	(cd snappy-$SNAPPY_VSN && $MAKE && $MAKE install)
     fi
 
-    echo "Inside leveldb_make 2"
-    
     export CFLAGS="$CFLAGS -I $BASEDIR/system/include"
     export CXXFLAGS="$CXXFLAGS -I $BASEDIR/system/include"
     export LDFLAGS="$LDFLAGS -L$BASEDIR/system/lib"
     export LD_LIBRARY_PATH="$BASEDIR/system/lib:$LD_LIBRARY_PATH"
     export LEVELDB_VSN="$LEVELDB_VSN"
 
-    echo "Inside leveldb_make 3"
-    
     leveldb_get_deps
 
-    echo "Inside leveldb_make 4"
-    
     # hack issue where high level make is running -j 4
     #  and causes build errors in leveldb
     export MAKEFLAGS=

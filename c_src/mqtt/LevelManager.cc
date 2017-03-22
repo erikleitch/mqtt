@@ -26,9 +26,7 @@ LevelManager::LevelManager()
  */
 void LevelManager::open(std::string dbName)
 {
-    COUT("Inside open");
 #if WITH_LEVELDB
-    COUT("Inside open with = 1");
 
     Options opts;
     opts.create_if_missing = true;
@@ -36,8 +34,6 @@ void LevelManager::open(std::string dbName)
     
     dbPtr_ = 0;
     Status status = DB::Open(opts, dbName, &dbPtr_);
-
-    COUT("Status = " << status.ToString() << " dbPtr = " << dbPtr_);
 
     if(!status.ok())
         ThrowRuntimeError("Error opening leveldb dir: " << status.ToString());

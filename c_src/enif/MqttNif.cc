@@ -125,6 +125,7 @@ namespace mqtt {
             COUTGREEN("    To subscribe to topic TopicName, with SchemaList (example: [sint64, timestamp, double, varchar]) and FormatAtom (either csv or json)");
 
             COUTGREEN(std::endl << "\r" << "Or a list of any of the above.");
+            COUTGREEN("");
             
             return ATOM_OK;
         }
@@ -147,6 +148,11 @@ namespace mqtt {
             return ATOM_OK;
         }
         
+        else if(atom == "print") {
+            std::cout << "this is a test" << std::endl << '\r' << std::endl;
+            return ATOM_OK;
+        }
+
         //------------------------------------------------------------
         // Start the client connection
         //------------------------------------------------------------
@@ -260,7 +266,8 @@ static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
         mqtt::ATOM_OK    = enif_make_atom(env, "ok");
         mqtt::ATOM_ERROR = enif_make_atom(env, "error");
         
-        COUTGREEN(std::endl << "\r" << "For information on supported commands, use mqtt:command({help})" << std::endl);
+        COUTGREEN(std::endl << "\r" << "For information on supported commands, use mqtt:command({help})");
+        COUTGREEN("   ");
 
         return ret_val;
             

@@ -14,6 +14,12 @@ using namespace nifutil;
 
 MosClient MosClient::instance_;
 
+#define LOG(text) \
+    {                                                                   \
+        if(log_)                                                        \
+            COUTGREEN(text);                                            \
+    }
+
 /**.......................................................................
  * Constructor.
  */
@@ -138,7 +144,7 @@ void MosClient::initAndRun()
         
         try {
 
-            COUT("MQTT Attempting to reconnect...");
+            COUTGREEN("MQTT Attempting to reconnect...");
 
             if(useCerts_)
                 certConfig();
@@ -147,16 +153,16 @@ void MosClient::initAndRun()
             retVal = mosquitto_connect(mosq_, host_.c_str(), port_, keepAlive_);
             
             if(retVal != MOSQ_ERR_SUCCESS) {
-                COUT("MQTT Unable to connect: return was: " << (retVal==MOSQ_ERR_INVAL ? "Invalid parameters" : "system error"));
+                COUTRED("MQTT Unable to connect: return was: " << (retVal==MOSQ_ERR_INVAL ? "Invalid parameters" : "system error"));
                 ThrowRuntimeError("Unable to connect");
             } else {
-                COUT("MQTT Successfully connected");
+                COUTGREEN("MQTT Successfully connected");
             }
             
             mosquitto_loop_forever(mosq_, -1, 1);
             
         } catch(...) {
-            COUT("MQTT Caught an error talking to broker -- attempting to reconnect in 1 second");
+            COUTRED("MQTT Caught an error talking to broker -- attempting to reconnect in 1 second");
             timeout.tv_sec  = 1;
             timeout.tv_usec = 0;
         }
@@ -211,9 +217,9 @@ void MosClient::connect_callback(struct mosquitto *mosq, void *userdata,
         }
 
     } catch(std::runtime_error& err) {
-        COUT("MQTT Caught an error in connect callback: " << err.what());
+        COUTRED("MQTT Caught an error in connect callback: " << err.what());
     } catch(...) {
-        COUT("MQTT Caught an unknown error in connect callback");
+        COUTRED("MQTT Caught an unknown error in connect callback");
     }
 }
 
@@ -229,9 +235,9 @@ void MosClient::disconnect_callback(struct mosquitto *mosq, void *userdata,
     try {
         client->connected_ = false;
     } catch(std::runtime_error& err) {
-        COUT("MQTT Caught an error in disconnect callback: " << err.what());
+        COUTRED("MQTT Caught an error in disconnect callback: " << err.what());
     } catch(...) {
-        COUT("MQTT Caught an unknown error in disconnect callback");
+        COUTRED("MQTT Caught an unknown error in disconnect callback");
     }
 }
 
@@ -250,12 +256,12 @@ void MosClient::subscribe_callback(struct mosquitto *mosq, void *userdata,
         for(int i=1; i < qos_count; i++)
             os << ", " << granted_qos[i];
         
-        COUT(os.str());
+        COUTGREEN(os.str());
 
     } catch(std::runtime_error& err) {
-        COUT("MQTT Caught an error in subscribe callback: " << err.what());
+        COUTRED("MQTT Caught an error in subscribe callback: " << err.what());
     } catch(...) {
-        COUT("MQTT Caught an unknown error in subscribe callback");
+        COUTRED("MQTT Caught an unknown error in subscribe callback");
     }
 }
 
@@ -624,7 +630,8 @@ void MosClient::logMessage(const struct mosquitto_message *message)
     for(int i=0; i < message->payloadlen; i++)
         msg << ((unsigned char*)message->payload)[i];
 
-    COUT("MQTT Got a message on topic: " << message->topic << ": " << msg.str());
+    COUTGREEN("MQTT Got a message on topic: " << message->topic << ": " << msg.str());
+    COUTGREEN("   ");
 }
 
 /**.......................................................................
@@ -682,15 +689,12 @@ void MosClient::subscribePrivate(std::string topic, std::string schema, std::vec
     //
     // Additionally, if we are connected, just subscribe right away
     
-    COUT("MQTT Adding topic " << topic << " to subscription list");
-
     topicList_.insert(topicList_.end(), topic);
     
     int qos    = 0;
     int retVal = 0;
 
     if(connected_) {
-        COUT("Here 0");
         retVal = mosquitto_subscribe(mosq_, NULL, topic.c_str(), qos);
     }
     
@@ -750,9 +754,7 @@ void MosClient::processMessage(const struct mosquitto_message *message)
         // Else process a normal message
 
     } else {
-        
-        if(!embedded_)
-            storeMessage(message);
+        storeMessage(message);
     }
 }
 
@@ -853,8 +855,7 @@ std::string MosClient::getEntry(std::map<std::string, std::string>& entryMap, st
 {
     if(entryMap.find(entry) == entryMap.end()) {
         
-        if(log_)
-            COUT("No entry: " << entry << " found in map.  Defaulting to: " << defVal);
+        LOG("No entry: " << entry << " found in map.  Defaulting to: " << defVal);
 
         return defVal;
         
@@ -874,24 +875,25 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
     if(!mosq)
         ThrowRuntimeError("Error allocating new mos session");
 
-    int retVal=0;
-    std::string host = getEntry(entryMap, "host", "localhost");
-    int port         = toInt(getEntry(entryMap, "port",    "1883"));
+    std::string host =       getEntry(entryMap, "host",   "localhost");
+    int port         = toInt(getEntry(entryMap, "port",   "1883"));
     unsigned delayms = toInt(getEntry(entryMap, "delayms", "0"));
                              
+    int retVal=0;
     retVal = mosquitto_connect(mosq, host.c_str(), port, keepAlive_);
 
     if(retVal != MOSQ_ERR_SUCCESS) {
         mosquitto_destroy(mosq);
         ThrowRuntimeError("Unable to connect");
     } else {
-        COUT("Successfully connected");
+//        COUT("Successfully connected");
     }
 
     try {
         db_.iterStart();
         
         std::string levelKey, levelVal;
+
         while(db_.iterValid()) {
             db_.iterGet(levelKey, levelVal);
             
@@ -904,14 +906,13 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
                 std::string key     = levelKey.substr(idx+1, levelKey.size() - (idx+1));
                 
                 // Re-publish on the specified message queue
-                
+
                 int retVal = mosquitto_publish(mosq, NULL, bucket.c_str(), levelVal.size(), &levelVal[0], 0, false);
 
                 if(retVal != MOSQ_ERR_SUCCESS)
                     ThrowRuntimeError(formatMosError(retVal));
 
-                if(log_)
-                    COUTGREEN("Published Bucket = " << bucket << " Key = '" << key << "' Val = '" << levelVal << "'");
+                LOG("Published Bucket = " << bucket << " Key = '" << key << "' Val = '" << levelVal << "'");
 
                 // Delay between publishing, if requested
                 
@@ -1023,6 +1024,12 @@ int MosClient::toInt(std::string str)
 #if WITH_ERL
 void MosClient::notify(const struct mosquitto_message *message)
 {
+    // Don't pass command messages on to listeners -- they are
+    // intended only for us
+    
+    if(message->topic == commandTopic_)
+        return;
+
     try {
         
         // Reuse the allocated msgEnv.  This saves us having to alloc
@@ -1088,23 +1095,21 @@ void MosClient::addSubscribeList(struct mosquitto *mosq)
     
     // Subscribe to any topics that have been requested
 
-    #if 0
+
     if(!topicList_.empty()) {
         for(std::list<std::string>::iterator iter=topicList_.begin();
             iter != topicList_.end(); iter++) {
 
-            COUT("MQTT Subscribing to topic " << (*iter).c_str());
+            LOG("MQTT Subscribing to topic " << (*iter).c_str());
 
-            COUT("Here 2");
             int retVal = mosquitto_subscribe(mosq, NULL, (*iter).c_str(), 0);
             if(retVal != MOSQ_ERR_SUCCESS)
                 ThrowRuntimeError(formatMosError(retVal));
         }
     }
-#endif
+
     // If running standalone, subscribe to name/command topic too
 
-    COUT("Here 3 : " << commandTopic_);
     int retVal = mosquitto_subscribe(mosq, NULL, commandTopic_.c_str(), 0);
     if(retVal != MOSQ_ERR_SUCCESS)
         ThrowRuntimeError(formatMosError(retVal));
@@ -1129,24 +1134,26 @@ std::string MosClient::getStatusSummaryPrivate()
     os << "certfile   = " << certFile_ << std::endl << "\r";
     os << "keyfile    = " << keyFile_  << std::endl << std::endl << "\r";
     
-    os << "MQTT Client is currently subscribed to the following topics: " << std::endl << "\r";
+    os << "MQTT Client is currently subscribed to the following topics: " << std::endl << std::endl << "\r";
 
     for(std::list<std::string>::iterator iter=topicList_.begin();
         iter != topicList_.end(); iter++) {
         std::string topic = *iter;
-        os << topic;
+        os << "   " << topic;
 
 #if WITH_ERL
-        os << " with schema: " << topicMap_[topic].schema_;
+        os << std::endl << "\r      with schema: " << topicMap_[topic].schema_;
 #endif
 
         os <<  std::endl << "\r";
     }
 
-    if(topicList_.empty()) {
-        os << "  (none)" << std::endl << "\r";
+    if(connected_) {
+        os << "   " << commandTopic_ << std::endl << "\r      with schema: {command:cmdname, arg1:val1, arg2:val2, ...}" << std::endl << "\r";
+    } else if(topicList_.empty()) {
+        os << "   (none)" << std::endl << "\r";
     }
-    
+
     os << NORM;
     
     return os.str();
