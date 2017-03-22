@@ -140,13 +140,10 @@ Recognized commands are:
        
        * Topic  -- topic name (i.e., ```"DeviceData" ```)
        * Schema -- schema (list of valid type atoms, like ```[varchar, double, timestamp]```)
-
            If specified, the client will attempt to format csv or json
            fields (see below) to match the specified type when
            processing MQTT messages.
-	   
        * Format -- atom (```csv``` or ```json```), optional (defaults to ```csv```)
-	
 	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
 	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
@@ -160,7 +157,7 @@ Recognized commands are:
 
    * ```{register}```
 
-     * Registers the calling process to be notified when messages are
+       Registers the calling process to be notified when messages are
        received from the broker on any of the subscribed topics.  If a
        schema was supplied when subscribing, the fields will be
        formatted appropriately when the calling process is notified.
@@ -168,21 +165,20 @@ Recognized commands are:
 
    * ```{start}```
 
-     * Starts up the background MQTT client (this should be called only once)
+       Starts up the background MQTT client (this should be called only once)
 
    * ```{status}```
 
-     * Print (and return) a status summary for the MQTT client
+       Print (and return) a status summary for the MQTT client
 
    * ```{Option, Value}```
    
-     * Configure the startup connection to the broker, by supplying an
+       Configure the startup connection to the broker, by supplying an
        appropriate `{Option, Value}` tuple
 
       For example:
 
-```
-      mqtt:command([
+```mqtt:command([
         {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
         {port,     8883},
         {capath,   "/path/to/my/cert/files"},
@@ -192,9 +188,9 @@ Recognized commands are:
    ]).
 ```
 
-     would configure the module to establish a connection to point to
-     a host in AWS at port 8883, with relevant security, when
-     `mqtt:spawnClient()` is called.
+      would configure the module to establish a connection to point to
+      a host in AWS at port 8883, with relevant security, when
+      `mqtt:spawnClient()` is called.
 
 <hr>
 ### Example
