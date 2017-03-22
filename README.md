@@ -10,7 +10,7 @@ or embedded in another erlang process.
 
 ## Compiling
 
-The ```mqtt``` module is built on top of the mosquitto client library,
+The `mqtt` module is built on top of the mosquitto client library,
 and requires the following environment variables to be defined:
 
 * MQTT_INC_DIR pointing to the installation of the mosquitto.h header
@@ -116,17 +116,16 @@ These functions are built on top of a single-point command interface
 ```mqtt:command(CommandTuple)```, provided by the NIF for manipulation
 of the client.
 
-The single argument is either a tuple of ```{CommandAtom,
-OptionalVal1, OptionalVal2,...}```, _or_ a list of such command
-tuples.
+The single argument is either a tuple of `{CommandAtom, OptionalVal1,
+OptionalVal2,...}`, _or_ a list of such command tuples.
 
 Recognized commands are:
 
-   * ```{logging, on|off}```
+   * `{logging, on|off}`
 
      * Toggle client logging (to stdout)
 
-   * ```{subscribe, Topic, Schema, Format}```
+   * `{subscribe, Topic, Schema, Format}`
 
        Adds a new topic to the list of topics the client should
        subscribe to.  (In the context of RiakTS, topic may correspond
@@ -138,27 +137,29 @@ Recognized commands are:
 
        Arguments are:
        
-       * Topic  -- topic name (i.e., ```"DeviceData" ```)
-       * Schema -- schema (list of valid type atoms, like ```[varchar, double, timestamp]```)
+       * Topic  -- topic name (i.e., `"DeviceData"`)
+       * Schema -- schema (list of valid type atoms, like `[varchar, double, timestamp]`)
 
        	   If specified, the client will attempt to format csv or json
            fields (see below) to match the specified type when
            processing MQTT messages.
 	   
-       * Format -- atom (```csv``` or ```json```), optional (defaults to ```csv```)
+       * Format -- atom (`csv` or `json`), optional (defaults to `csv`)
 
        	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
 	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
         For example use:
- 
-           `mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})`
+
+```
+           mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})`
+```
 
            to subscribe to topic GeoCheckin, whose messages are
-           expected to be of the format: `"mystring, 100012, 3, 1.234,
-           false"`
+           expected to be of the format: "mystring, 100012, 3, 1.234,
+           false"
 
-   * ```{register}```
+   * `{register}`
 
        Registers the calling process to be notified when messages are
        received from the broker on any of the subscribed topics.  If a
@@ -166,15 +167,15 @@ Recognized commands are:
        formatted appropriately when the calling process is notified.
        Else they will be strings.
 
-   * ```{start}```
+   * `{start}`
 
        Starts up the background MQTT client (this should be called only once)
 
-   * ```{status}```
+   * `{status}`
 
        Print (and return) a status summary for the MQTT client
 
-   * ```{Option, Value}```
+   * `{Option, Value}`
    
        Configure the startup connection to the broker, by supplying an
        appropriate `{Option, Value}` tuple
