@@ -181,15 +181,16 @@ Recognized commands are:
 
       For example:
 
-         `mqtt:command([
+```
+       mqtt:command([
             {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
             {port,     8883},
             {capath,   "/path/to/my/cert/files"},
             {cafile,   "root-CA.crt"},
             {certfile, "riak-sink.cert.pem"},
             {keyfile,  "riak-sink.private.key"}
-          ]).`
-
+          ]).
+```
 
       would configure the module to establish a connection to point to
       a host in AWS at port 8883, with relevant security, when
