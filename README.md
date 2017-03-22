@@ -151,7 +151,9 @@ Recognized commands are:
 
         For example use:
 
+```erlang
 	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
+```
 
         to subscribe to topic GeoCheckin, whose messages are expected
         to be of the format: "mystring, 100012, 3, 1.234, false"
@@ -177,9 +179,11 @@ Recognized commands are:
        Configure the startup connection to the broker, by supplying an
        appropriate `{Option, Value}` tuple
 
-      For example:
+      For example to configure the module to establish a connection to
+      point to a host in AWS at port 8883, with relevant security,
+      when `mqtt:spawnClient()` is called, use:
 
-```
+```erlang
            mqtt:command([
                 {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
                 {port,     8883},
@@ -190,9 +194,6 @@ Recognized commands are:
               ]).
 ```
 
-      would configure the module to establish a connection to point to
-      a host in AWS at port 8883, with relevant security, when
-      `mqtt:spawnClient()` is called.
 
 <hr>
 ### Example
