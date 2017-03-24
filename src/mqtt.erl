@@ -21,13 +21,15 @@
 
 -export([command/1, 
 	 startCommsLoop/2, 
-	 startCommsLoop/3, 
+
+	 startCommsLoopPrint/0,
+	 startCommsLoopPrintCerts/0,
+
 	 startCommsLoopRiak/0, 
 	 startCommsLoopRiak/1, 
-	 startCommsLoopRiakAlex/0, 
-	 startCommsLoopNoneAlex/0, 
-	 startCommsLoopPrint/0, 
-	 startCommsLoopFake/0]).
+	 startCommsLoopRiak/2, 
+	 startCommsLoopRiak/3, 
+	 startCommsLoopRiakCerts/0]). 
 
 -compile([export_all]).
 
@@ -211,32 +213,40 @@ getCurrentTables(ModList, OldSchemaSet) ->
 %% Communication loop framework
 %%=======================================================================
 
-startCommsLoop([], CallbackFn, StartScanner) ->
-    startCommsLoop(CallbackFn, StartScanner);
-startCommsLoop(OptList, CallbackFn, StartScanner) ->
-    mqtt:command(OptList),
-    startCommsLoop(CallbackFn, StartScanner).
-
-startCommsLoop(CallbackFn, true) ->
-    spawnClient(),
-    spawnScanner(),
-    spawnListener(CallbackFn);
-startCommsLoop(CallbackFn, false) ->
+startCommsLoop(CallbackFn) ->
     spawnClient(),
     spawnListener(CallbackFn).
 
+startCommsLoop([], CallbackFn) ->
+    startCommsLoop(CallbackFn);
+startCommsLoop(OptList, CallbackFn) ->
+    mqtt:command(OptList),
+    startCommsLoop(CallbackFn).
+
 %%-----------------------------------------------------------------------
-%% Riak TS comms loop, that forwards received messages to
-%% riak_kv_ts_svc for processing
+%% Riak TS comms loop, that optionally allows scanning for new TS tables
 %%-----------------------------------------------------------------------
 
 startCommsLoopRiak() ->
-    startCommsLoop([], fun mqtt:sendTsMsg/1, false).
+    startCommsLoopRiak([], fun mqtt:sendTsMsg/1, false).
 
 startCommsLoopRiak(OptList) ->
-    startCommsLoop(OptList, fun mqtt:sendTsMsg/1, false).
+    startCommsLoopRiak(OptList, fun mqtt:sendTsMsg/1, false).
     
-startCommsLoopRiakAlex() ->
+startCommsLoopRiak(CallbackFn, false) ->
+    startCommsLoop(CallbackFn);
+startCommsLoopRiak(CallbackFn, true) ->
+    spawnClient(),
+    spawnScanner(),
+    spawnListener(CallbackFn).
+
+startCommsLoopRiak([], CallbackFn, Scanner) ->
+    startCommsLoopRiak(CallbackFn, Scanner);
+startCommsLoopRiak(OptList, CallbackFn, Scanner) ->
+    mqtt:command(OptList),
+    startCommsLoopRiak(CallbackFn, Scanner).
+
+startCommsLoopRiakCerts() ->
     startCommsLoopRiak([
 			{host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
 			{port,     8883},
@@ -264,40 +274,21 @@ sendTsMsg(MqttMsg) ->
 %%-----------------------------------------------------------------------
 
 startCommsLoopPrint() ->
-    startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
+    startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end).
 
 %%-----------------------------------------------------------------------
 %% Comms loop that uses cert files and prints messages received from
 %% the broker
 %%-----------------------------------------------------------------------
 
-startCommsLoopNoneAlex() ->
+startCommsLoopPrintCerts() ->
     OptList = [{host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
 	       {port,     8883},
 	       {capath,   "/Users/eml/projects/mqtt/alexpi"},
 	       {cafile,   "root-CA.crt"},
 	       {certfile, "riak-sink.cert.pem"},
 	       {keyfile,  "riak-sink.private.key"}],
-    startCommsLoop(OptList, fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
-
-%%-----------------------------------------------------------------------
-%% Test comms loop that forwards a fake TS message for every received
-%% message. Used only for testing
-%%-----------------------------------------------------------------------
-
-startCommsLoopFake() ->
-    startCommsLoop(fun mqtt:sendFakeKvMsg/1, true).
-
-sendFakeKvMsg(_Msg) ->
-    State = {state,undefined,undefined,undefined,undefined},
-    Msg = {tsputreq, <<"GeoCheckin">>, [], [{<<"familyMqtt">>,<<"seriesMqtt">>,random:uniform(10000),-2,<<"binval">>,1.234,true}]},
-    Ret   = riak_kv_ts_svc:process(Msg, State),
-    case Ret of
-        {reply, {tsputresp}, State} ->
-            ok;
-        _ ->
-            io:format("MQTT Sent Msg = ~p Got Ret = ~p~n", [Msg, Ret])
-    end.
+    startCommsLoop(OptList, fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end).
 
 %%=======================================================================
 %% Module initialization

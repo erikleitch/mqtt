@@ -40,7 +40,7 @@ registering callbacks when messages are received.
 For example,`mqtt:spawnClient/0` spawns a client that connects to a
 default broker running on localhost, and `mqtt:spawnListener/1` allows
 you to register a callback function that is called when messages
-arrive on subscribed topics.  Alternatively, `mqtt:startCommsLoop/3`
+arrive on subscribed topics.  Alternatively, `mqtt:startCommsLoop/2`
 provides a unified interface for configuring and starting the client,
 as well as registering a callback.
 
@@ -221,7 +221,7 @@ subscribe to topics like:
 
 ```erlang
 Eshell V5.10.3  (abort with ^G)
-1>mqtt:startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
+1>mqtt:startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end).
 
 For information on supported commands, use mqtt:command({help})
 
