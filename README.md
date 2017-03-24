@@ -247,9 +247,9 @@ issued from a shell will produce:
 Received message: {"test",{<<"val1">>,1.234}}
 ```
 
-As you can see, because the MQTT message has a known schema, the
-fields in the message returned to erlang have already been formatted
-by type.
+in your erlang shell.  As you can see, because the MQTT message has a
+known schema, the fields in the message returned to erlang have
+already been formatted by type.
 
 You can subscribe to additional topics at any time.  For example if
 you typed
@@ -276,6 +276,7 @@ formatting is applied, and the entirely of the message is returned as
 an erlang binary.
 
 <hr>
+
 ## MQTT Example
 
 In the example above, new topics were subscribed to by configuring the
@@ -304,3 +305,16 @@ mosquitto_pub -t "mosclient/command" -m "{command:dump, host:localhost, port:188
 this would cause stored messages to be replayed to a local broker
 listening on port 1884, with a 1-ms delay between publishing each key
 (some brokers cannot be published to as fast as clients can write).
+
+## Stand-alone Example:
+
+The ability to replay stored messages via an MQTT network is intended
+as a simple proof-of-concept of a standalone IoT device recording data
+via an MQTT broker, then relaying that data to a local or cloud
+database when connected to a network.
+
+An absolutely minimal client implementation that runs as a stand-alone
+C++ executable is also provided with the repo.  Running `bin/tMqtt`
+will instantiate a client with a leveldb backing store.  It attempts
+to connect to a broker running on localhost:1883, but allows
+configuration as in the example above, via the MQTT interface.
