@@ -225,10 +225,10 @@ Eshell V5.10.3  (abort with ^G)
 
 For information on supported commands, use mqtt:command({help})
 
-   <0.38.0>
-   MQTT Attempting to reconnect...
-   MQTT Successfully connected
-   MQTT Subscribed (mid: 1) 0
+<0.38.0>
+MQTT Attempting to reconnect...
+MQTT Successfully connected
+MQTT Subscribed (mid: 1) 0
 
 2> mqtt:command({subscribe, test, [varchar, double], csv}).
 ok
