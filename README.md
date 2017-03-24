@@ -8,7 +8,7 @@ or embedded in another erlang process.
 
 <hr>
 
-##Index
+## Index
 
 * <a href=#compiling>Compiling</a>
 * <a href=#description>Description</a>
