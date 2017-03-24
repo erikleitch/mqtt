@@ -81,7 +81,7 @@ Recognized commands are:
 
    * dump
 
-       erlang: `mqtt:command({dump, Host, Port, DelayMs})`
+       erlang: `mqtt:command({dump, Host, Port, DelayMs})`<br>
        MQTT:   `{command:dump, host:Host, port:Port, delayms:DelayMs}`
 
        If storing messages, dump stored messages to the specified broker
