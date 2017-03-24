@@ -40,16 +40,20 @@ registering callbacks when messages are received.
 For example,`mqtt:spawnClient/0` spawns a client that connects to a
 default broker running on localhost, and `mqtt:spawnListener/1` allows
 you to register a callback function that is called when messages
-arrive on subscribed topics.
+arrive on subscribed topics.  Alternatively, `mqtt:startCommsLoop/3`
+provides a unified interface for configuring and starting the client,
+as well as registering a callback.
 
 These functions are built on top of a single-point erlang command
 interface ```mqtt:command(CommandTuple)```, provided by the NIF for
-manipulation of the client. (see <a href=#interface>Command
-Interface</a>, below).
+manipulation of the client. 
 
 A parallel MQTT command interface is provided by writing messages to a
 special command topic, which the client automatically subscribes to on
 start-up.
+
+For documentation of both of these interfaces, see <a
+href=#interface>Command Interface</a>, below.
 
 You can subscribe to new topics on the fly, and optionally, if
 compiled with `MQTT_USE_LEVELDB=1`, the client can be configured to
@@ -165,9 +169,31 @@ Recognized commands are:
        MQTT: N/A
    
        Configure the startup connection to the broker, by supplying an
-       appropriate `{Option, Value}` tuple
+       appropriate `{Option, Value}` tuple:
 
-       For example to configure the module to establish a connection to
+       Client specs:
+
+       * `name` - an internal name for the client.  Client will
+         register on topic "[name]/command" to listen for MQTT
+         commands, and if using a backing store, will use
+         "/tmp/[name]" as the root leveldb directory.
+
+       * `useleveldb` - true to use a leveldb backing store.  Must have
+         compiled with MQTT_USE_LEVELDB=1
+       
+       Connection specs:
+       
+       * `host` - broker to connect to, e.g. "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"
+       * `port` - broker port to connect to, e.g. 8883},
+
+       Connection security
+
+       * `capath` - path to certificate authority files, e.g. "/path/to/my/cert/files"
+       * `cafile` - root certificate file, e.g. "root-CA.crt"
+       * `certfile` - certificate file, e.g. "riak-sink.cert.pem"},
+       * `keyfile` - keyfile, "riak-sink.private.key"
+
+For example to configure the module to establish a connection to
        point to a host in AWS at port 8883, with relevant security,
        when `mqtt:spawnClient()` is called, use:
 
