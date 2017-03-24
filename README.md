@@ -59,7 +59,8 @@ command via either the erlang or MQTT interface.
 
 <hr>
 
-<a name=interface>## Command Interface</a>
+<a name=interface></a>
+## Command Interface
 
 The module provides a simple erlang interface for manipulating the
 client, via the `mqtt:command/1` method.
