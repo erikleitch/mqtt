@@ -8,6 +8,18 @@ or embedded in another erlang process.
 
 <hr>
 
+##Index
+
+* <a href=#compiling>Compiling</a>
+* <a href=#description>Description</a>
+* <a href=#interface>Command Interfaces</a>
+* <a href=#erex>Erlang Example</a>
+* <a href=#mqex>MQTT Example</a>
+* <a href=#stex>Stand-alone Example</a>
+
+<hr>
+
+<a name=compiling></a>
 ## Compiling
 
 The `mqtt` module is built on top of the mosquitto client library,
@@ -30,6 +42,7 @@ libraries will be built when `make` is invoked.
 
 <hr>
 
+<a name=description></a>
 ## Description
 
 At its most basic, the mqtt module allows you to spawn an MQTT client
@@ -64,13 +77,12 @@ command via either the erlang or MQTT interface.
 <hr>
 
 <a name=interface></a>
-## Command Interface
+## Command Interfaces
 
 The module provides a simple erlang interface for manipulating the
-client, via the `mqtt:command/1` method.
-
-The single argument is either a tuple of `{CommandAtom, OptionalVal1,
-OptionalVal2,...}`, _or_ a list of such command tuples.
+client, via the `mqtt:command/1` method.  The single argument is
+either a tuple of `{CommandAtom, OptionalVal1, OptionalVal2,...}`,
+_or_ a list of such command tuples.
 
 Additionally, the client provides a parallel MQTT command interface.
 On startup, the clients subscribe to a special command topic, by
@@ -178,7 +190,7 @@ Recognized commands are:
          commands, and if using a backing store, will use
          "/tmp/[name]" as the root leveldb directory.
 
-       * `useleveldb` - true to use a leveldb backing store.  Must have
+       * `store` - true to use a leveldb backing store.  Must have
          compiled with MQTT_USE_LEVELDB=1
        
        Connection specs:
@@ -210,7 +222,8 @@ For example to configure the module to establish a connection to
 
 <hr>
 
-## Erlang Example:
+<a name=erex></a>
+## Erlang Example
 
 Suppose you've previously started an MQTT broker, as in:
 
@@ -278,6 +291,7 @@ an erlang binary.
 
 <hr>
 
+<a name=mqex></a>
 ## MQTT Example
 
 In the example above, new topics were subscribed to by configuring the
@@ -307,7 +321,10 @@ this would cause stored messages to be replayed to a local broker
 listening on port 1884, with a 1-ms delay between publishing each key
 (some brokers cannot be published to as fast as clients can write).
 
-## Stand-alone Example:
+<hr>
+
+<a name=stex></a>
+## Stand-alone Example
 
 The ability to replay stored messages via an MQTT network is intended
 as a simple proof-of-concept of a standalone IoT device recording data
