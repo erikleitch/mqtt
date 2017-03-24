@@ -219,8 +219,6 @@ Suppose you've previously started a mosquitto broker, as in:
 You can start up an erlang shell, and initialize the comms loop, like:
 
 ```erlang
-Erlang R16B02_basho8 (erts-5.10.3) [source] [64-bit] [smp:8:8] [async-threads:10] [hipe] [kernel-poll:false]
-
 Eshell V5.10.3  (abort with ^G)
 1> mqtt:startCommsLoopPrint().
 
@@ -245,7 +243,7 @@ mosquitto_pub -t "test" -m "val1, 1.234"
 ```
 issued from a shell will produce:
 
-```
+```erlang
 Received message: {"test",{<<"val1">>,1.234}}
 ```
 
@@ -256,7 +254,7 @@ by type.
 You can subscribe to additional topics at any time.  For example if
 you typed
 
-```
+```erlang
 3> mqtt:command({subscribe, "test2"}).
 ok
 MQTT Subscribed (mid: 3) 0
@@ -269,7 +267,7 @@ publishing data to the broker on the new topic, like:
 
 will now cause the new messages to be received in erlang:
 
-```
+```erlang
 Received message: {"test2",{<<"val1, 1.235">>}}
 ```
 
