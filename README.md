@@ -212,15 +212,16 @@ For example to configure the module to establish a connection to
 
 ## Erlang Example:
 
-Suppose you've previously started a mosquitto broker, as in:
+Suppose you've previously started an MQTT broker, as in:
 
 ```mosquitto -c /usr/local/etc/mosquitto/mosquitto.conf```
 
-You can start up an erlang shell, and initialize the comms loop, like:
+You can start up an erlang shell, initialize the comms loop, and
+subscribe to topics like:
 
 ```erlang
 Eshell V5.10.3  (abort with ^G)
-1> mqtt:startCommsLoopPrint().
+1>mqtt:startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
 
 For information on supported commands, use mqtt:command({help})
 
