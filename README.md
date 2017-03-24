@@ -30,28 +30,58 @@ libraries will be built when `make` is invoked.
 
 <hr>
 
-## Erlang Interface
+## Description
 
 At its most basic, the mqtt module allows you to spawn an MQTT client
 in erlang, and register to be notified when messages arrive on any
-subscribed topics.
+subscribed topics.  The module provides convenience functions for
+registering callbacks when messages are received.
 
 For example,`mqtt:spawnClient/0` spawns a client that connects to a
 default broker running on localhost, and `mqtt:spawnListener/1` allows
 you to register a callback function that is called when messages
 arrive on subscribed topics.
 
-These functions are built on top of a single-point command interface
-```mqtt:command(CommandTuple)```, provided by the NIF for manipulation
-of the client.
+These functions are built on top of a single-point erlang command
+interface ```mqtt:command(CommandTuple)```, provided by the NIF for
+manipulation of the client. (see <a href=#interface>Command
+Interface</a>, below).
+
+A parallel MQTT command interface is provided by writing messages to a
+special command topic, which the client automatically subscribes to on
+start-up.
+
+You can subscribe to new topics on the fly, and optionally, if
+compiled with `MQTT_USE_LEVELDB=1`, the client can be configured to
+store messages in a local leveldb instance.  If using a backing store,
+messages can be relayed to another broker by issuing the `dump`
+command via either the erlang or MQTT interface.
+
+<hr>
+
+<a name=interface>## Command Interface</a>
+
+The module provides a simple erlang interface for manipulating the
+client, via the `mqtt:command/1` method.
 
 The single argument is either a tuple of `{CommandAtom, OptionalVal1,
 OptionalVal2,...}`, _or_ a list of such command tuples.
 
+Additionally, the client provides a parallel MQTT command interface.
+On startup, the clients subscribe to a special command topic, by
+default called: `mosclient/command` (this can be modified by using the
+`mqtt:command({name, Name})` option).  JSON-formatted MQTT messages
+sent to this topic of the form `{command:cmdname, arg1:val1,
+arg2:val2,...}` are processed internally as commands.
+
+Both interfaces are documented below.
+
 Recognized commands are:
 
-   * erlang: `mqtt:command({dump, Host, Port, DelayMs})`
-   * MQTT:   `{command:dump, host:Host, port:Port, delayms:DelayMs}`
+   * dump
+
+       erlang: `mqtt:command({dump, Host, Port, DelayMs})`
+       MQTT:   `{command:dump, host:Host, port:Port, delayms:DelayMs}`
 
        If storing messages, dump stored messages to the specified broker
 
@@ -61,13 +91,17 @@ Recognized commands are:
        * Port -- the port on which the broker is listening
        * DelayMs -- delay, in ms, between writes to the broker
        
-   * erlang: `mqtt:command({logging, on|off})`
-   * MQTT:   `{command:logging, value:on|off}`
+   * logging
 
-     * Toggle client logging (to stdout)
+       erlang: `mqtt:command({logging, on|off})`
+       MQTT:   `{command:logging, value:on|off}`
 
-   * erlang: `mqtt:command({subscribe, Topic, Schema, Format})`
-   * MQTT:   `{command:subscribe, topic:Topic, schema:Schema, format:Format}`
+       Toggle client logging (to stdout)
+
+   * subscribe
+
+       erlang: `mqtt:command({subscribe, Topic, Schema, Format})`
+       MQTT:   `{command:subscribe, topic:Topic, schema:Schema, format:Format}`
 
        Adds a new topic to the list of topics the client should
        subscribe to.  (In the context of RiakTS, topic may correspond
@@ -92,17 +126,17 @@ Recognized commands are:
        	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
 	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
-        For example use:
+        For example, to subscribe to topic "GeoCheckin", whose messages are expected
+        to be of the format: "mystring, 100012, 3, 1.234, false"
 
 ```erlang
 	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
 ```
 
-        to subscribe to topic GeoCheckin, whose messages are expected
-        to be of the format: "mystring, 100012, 3, 1.234, false"
+   * register
 
-   * erlang: `mqtt:command({register})`
-   * MQTT: N/A
+       erlang: `mqtt:command({register})`
+       MQTT: N/A
 
        Registers the calling process to be notified when messages are
        received from the broker on any of the subscribed topics.  If a
@@ -110,25 +144,31 @@ Recognized commands are:
        formatted appropriately when the calling process is notified.
        Else they will be strings.
 
-   * erlang: `mqtt:command({start})`
-   * MQTT: N/A
+   * start
+
+       erlang: `mqtt:command({start})`
+       MQTT: N/A
 
        Starts up the background MQTT client (this should be called only once)
 
-   * erlang: `mqtt:command({status})`
-   * MQTT: `{command:status}`
+   * status
 
-       Print (and return) a status summary for the MQTT client
+       erlang: `mqtt:command({status})`
+       MQTT: `{command:status}`
 
-   * `{Option, Value}`
-   * MQTT: N/A
+       Print a status summary for the MQTT client
+
+   * [option]
+
+       erlang: `mqtt:command({Option, Value})`
+       MQTT: N/A
    
        Configure the startup connection to the broker, by supplying an
        appropriate `{Option, Value}` tuple
 
-      For example to configure the module to establish a connection to
-      point to a host in AWS at port 8883, with relevant security,
-      when `mqtt:spawnClient()` is called, use:
+       For example to configure the module to establish a connection to
+       point to a host in AWS at port 8883, with relevant security,
+       when `mqtt:spawnClient()` is called, use:
 
 ```erlang
            mqtt:command([
@@ -143,14 +183,7 @@ Recognized commands are:
 
 <hr>
 
-## MQTT interface
-
-At its most basic, both `bin/tMqtt` and `mqtt:spawnClient()` spawn a
-client that connects to a default broker running on localhost.  On
-startup, the clients subscribe to a special command topic, by default
-called: `mosclient/command`.  JSON-formatted MQTT messages sent to
-this topic of the form `{command:cmdname, arg1:val1, arg2:val2,...}`
-are processed internally as commands.
+## MQTT Example
 
 For example, to tell the default client to subscribe to a new topic `newtopic`:
 
