@@ -94,14 +94,14 @@ Recognized commands are:
        
    * logging
 
-       erlang: `mqtt:command({logging, on|off})`
+       erlang: `mqtt:command({logging, on|off})`<br>
        MQTT:   `{command:logging, value:on|off}`
 
        Toggle client logging (to stdout)
 
    * subscribe
 
-       erlang: `mqtt:command({subscribe, Topic, Schema, Format})`
+       erlang: `mqtt:command({subscribe, Topic, Schema, Format})`<br>
        MQTT:   `{command:subscribe, topic:Topic, schema:Schema, format:Format}`
 
        Adds a new topic to the list of topics the client should
@@ -136,7 +136,7 @@ Recognized commands are:
 
    * register
 
-       erlang: `mqtt:command({register})`
+       erlang: `mqtt:command({register})`<br>
        MQTT: N/A
 
        Registers the calling process to be notified when messages are
@@ -147,21 +147,21 @@ Recognized commands are:
 
    * start
 
-       erlang: `mqtt:command({start})`
+       erlang: `mqtt:command({start})`<br>
        MQTT: N/A
 
        Starts up the background MQTT client (this should be called only once)
 
    * status
 
-       erlang: `mqtt:command({status})`
+       erlang: `mqtt:command({status})`<br>
        MQTT: `{command:status}`
 
        Print a status summary for the MQTT client
 
    * [option]
 
-       erlang: `mqtt:command({Option, Value})`
+       erlang: `mqtt:command({Option, Value})`<br>
        MQTT: N/A
    
        Configure the startup connection to the broker, by supplying an
