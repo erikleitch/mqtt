@@ -168,30 +168,64 @@ namespace mqtt {
             
         else if(atom == "subscribe") {
 
-            if(cells.size() < 3)
-                ThrowRuntimeError("Usage: command([subscribe, Topic, Schema, Format])");
-
-            std::string topic     = ErlUtil::getString(env, cells[1]);
-            std::string schemaStr = ErlUtil::formatTerm(env, cells[2]);
-                
-            std::vector<ERL_NIF_TERM> schemaTerms = ErlUtil::getListCells(env, cells[2]);
-            std::vector<STRING_CONV_FN_PTR> convFnVec;
-                
-            for(unsigned i=0; i < schemaTerms.size(); i++) {
-                std::string atom = ErlUtil::getAtom(env, schemaTerms[i]);
-                convFnVec.push_back(ErlUtil::getStringConvFn(atom));
-            }
-
+            // Process optional format
+            
             std::string format = "csv";
             
             if(cells.size() == 4)
                 format = ErlUtil::formatTerm(env, cells[3]);
+
+            // Process optional schema
+            
+            std::vector<STRING_CONV_FN_PTR> convFnVec;
+
+            std::string schemaStr = "[varchar]";
+            
+            if(cells.size() > 2) {
+                schemaStr = ErlUtil::formatTerm(env, cells[2]);
+                
+                std::vector<ERL_NIF_TERM> schemaTerms = ErlUtil::getListCells(env, cells[2]);
+                
+                for(unsigned i=0; i < schemaTerms.size(); i++) {
+                    std::string atom = ErlUtil::getAtom(env, schemaTerms[i]);
+                    convFnVec.push_back(ErlUtil::getStringConvFn(atom));
+                }
+            }
+
+            if(cells.size() < 2)
+                ThrowRuntimeError("Usage: {subscribe, Topic, Schema, Format}");
+            
+            std::string topic = ErlUtil::getString(env, cells[1]);
             
             MosClient::subscribe(topic, schemaStr, convFnVec, format);
             
             return ATOM_OK;
         }
 
+        //------------------------------------------------------------
+        // Dump to another broker
+        //------------------------------------------------------------
+        
+        else if(atom == "dump") {
+
+            std::map<std::string, std::string> entryMap;
+            
+            entryMap["delayms"] = "0";
+            if(cells.size() >= 4)
+                entryMap["delayms"] = ErlUtil::formatTerm(env, cells[3]);
+
+            entryMap["port"] = "1883";
+            if(cells.size() >= 3)
+                entryMap["port"] = ErlUtil::formatTerm(env, cells[2]);
+
+            entryMap["host"] = "localhost";
+            if(cells.size() > 1)
+                entryMap["host"] = ErlUtil::formatTerm(env, cells[1]);
+
+            MosClient::dumpToBroker(entryMap);
+            return ATOM_OK;
+        }
+        
         //------------------------------------------------------------
         // Print status information about the client
         //------------------------------------------------------------

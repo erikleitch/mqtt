@@ -30,7 +30,120 @@ libraries will be built when `make` is invoked.
 
 <hr>
 
-## Stand-alone usage
+## Erlang Interface
+
+At its most basic, the mqtt module allows you to spawn an MQTT client
+in erlang, and register to be notified when messages arrive on any
+subscribed topics.
+
+For example,`mqtt:spawnClient/0` spawns a client that connects to a
+default broker running on localhost, and `mqtt:spawnListener/1` allows
+you to register a callback function that is called when messages
+arrive on subscribed topics.
+
+These functions are built on top of a single-point command interface
+```mqtt:command(CommandTuple)```, provided by the NIF for manipulation
+of the client.
+
+The single argument is either a tuple of `{CommandAtom, OptionalVal1,
+OptionalVal2,...}`, _or_ a list of such command tuples.
+
+Recognized commands are:
+
+   * erlang: `mqtt:command({dump, Host, Port, DelayMs})`
+   * MQTT:   `{command:dump, host:Host, port:Port, delayms:DelayMs}`
+
+       If storing messages, dump stored messages to the specified broker
+
+       Arguments are:
+
+       * Host -- the host on which the broker is running
+       * Port -- the port on which the broker is listening
+       * DelayMs -- delay, in ms, between writes to the broker
+       
+   * erlang: `mqtt:command({logging, on|off})`
+   * MQTT:   `{command:logging, value:on|off}`
+
+     * Toggle client logging (to stdout)
+
+   * erlang: `mqtt:command({subscribe, Topic, Schema, Format})`
+   * MQTT:   `{command:subscribe, topic:Topic, schema:Schema, format:Format}`
+
+       Adds a new topic to the list of topics the client should
+       subscribe to.  (In the context of RiakTS, topic may correspond
+       directly to a TS table name, and the Schema to the schema for
+       that table.)  This schema will be used to encode the string data
+       received from the MQTT broker before handing back to the erlang
+       layer, and consists of a list of TS table field types, in
+       order.
+
+       Arguments are:
+       
+       * Topic  -- topic name (i.e., `"DeviceData"`)
+       * Schema -- schema (list of valid type atoms, like `[varchar, double, timestamp]`)
+
+       	    If specified, the client will attempt to format csv or
+            json fields (see below) to match the specified type when
+            processing MQTT messages.  If not specified, the message
+            will be returned as a single binary type.
+	   
+       * Format -- atom (`csv` or `json`), optional (defaults to `csv`)
+
+       	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
+	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
+
+        For example use:
+
+```erlang
+	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
+```
+
+        to subscribe to topic GeoCheckin, whose messages are expected
+        to be of the format: "mystring, 100012, 3, 1.234, false"
+
+   * erlang: `mqtt:command({register})`
+   * MQTT: N/A
+
+       Registers the calling process to be notified when messages are
+       received from the broker on any of the subscribed topics.  If a
+       schema was supplied when subscribing, the fields will be
+       formatted appropriately when the calling process is notified.
+       Else they will be strings.
+
+   * erlang: `mqtt:command({start})`
+   * MQTT: N/A
+
+       Starts up the background MQTT client (this should be called only once)
+
+   * erlang: `mqtt:command({status})`
+   * MQTT: `{command:status}`
+
+       Print (and return) a status summary for the MQTT client
+
+   * `{Option, Value}`
+   * MQTT: N/A
+   
+       Configure the startup connection to the broker, by supplying an
+       appropriate `{Option, Value}` tuple
+
+      For example to configure the module to establish a connection to
+      point to a host in AWS at port 8883, with relevant security,
+      when `mqtt:spawnClient()` is called, use:
+
+```erlang
+           mqtt:command([
+                {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
+                {port,     8883},
+                {capath,   "/path/to/my/cert/files"},
+                {cafile,   "root-CA.crt"},
+                {certfile, "riak-sink.cert.pem"},
+                {keyfile,  "riak-sink.private.key"}
+              ]).
+```
+
+<hr>
+
+## MQTT interface
 
 At its most basic, both `bin/tMqtt` and `mqtt:spawnClient()` spawn a
 client that connects to a default broker running on localhost.  On
@@ -62,141 +175,9 @@ this would cause stored messages to be replayed to a local broker
 listening on port 1884, with a 1-ms delay between publishing each key
 (some brokers cannot be published to as fast as clients can write).
 
-## Stand-alone erlang usage
-
-The erlang module supports additional functionality that lets you
-configure the startup connection to the broker, via the
-`mqtt:command/1` interface.  This can take a tuple of `{param, value}`
-pairs, or a list of such tuples.
-
-For example:
-
-```
-mqtt:command([
-     {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
-     {port,     8883},
-     {capath,   "/path/to/my/cert/files"},
-     {cafile,   "root-CA.crt"},
-     {certfile, "riak-sink.cert.pem"},
-     {keyfile,  "riak-sink.private.key"}
-]).
-```
-
-would configure the module to establish a connection to point to a host in AWS at
-port 8883, with relevant security, when `mqtt:spawnClient()` is called.
-
-The command interface gives you complete control over the client
-behavior, including subscribing to topics:
-
-```
-mqtt:command({subscribe, "temperatures", [varchar,double,timestamp,varchar], json})
-```
-
-or even starting the client:
-
-```
-mqtt:command({start}).
-```
-
-(`mqtt:spawnClient()` is just a wrapper around some of these commands)
-Type `mqtt:command({help})` for a list of functions the module supports.
-
-## Embedded erlang Usage
-
-At its most basic, the mqtt module allows you to spawn an MQTT client
-in erlang, and register to be notified when messages arrive on any
-subscribed topics.
-
-For example,`mqtt:spawnClient/0` spawns a client that connects to a
-default broker running on localhost, and `mqtt:spawnListener/1` allows
-you to register a callback function that is called when messages
-arrive on subscribed topics.
-
-These functions are built on top of a single-point command interface
-```mqtt:command(CommandTuple)```, provided by the NIF for manipulation
-of the client.
-
-The single argument is either a tuple of `{CommandAtom, OptionalVal1,
-OptionalVal2,...}`, _or_ a list of such command tuples.
-
-Recognized commands are:
-
-   * `{logging, on|off}`
-
-     * Toggle client logging (to stdout)
-
-   * `{subscribe, Topic, Schema, Format}`
-
-       Adds a new topic to the list of topics the client should
-       subscribe to.  (In the context of RiakTS, topic may correspond
-       directly to a TS table name, and the Schema to the schema for
-       that table.)  This schema will be used to encode the string data
-       received from the MQTT broker before handing back to the erlang
-       layer, and consists of a list of TS table field types, in
-       order.
-
-       Arguments are:
-       
-       * Topic  -- topic name (i.e., `"DeviceData"`)
-       * Schema -- schema (list of valid type atoms, like `[varchar, double, timestamp]`)
-
-       	   If specified, the client will attempt to format csv or json
-           fields (see below) to match the specified type when
-           processing MQTT messages.
-	   
-       * Format -- atom (`csv` or `json`), optional (defaults to `csv`)
-
-       	    If specified as cvs, mqtt expects string messages to be formatted as comma-separated items: `val1, val2, val3`
-	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
-
-        For example use:
-
-```erlang
-	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
-```
-
-        to subscribe to topic GeoCheckin, whose messages are expected
-        to be of the format: "mystring, 100012, 3, 1.234, false"
-
-   * `{register}`
-
-       Registers the calling process to be notified when messages are
-       received from the broker on any of the subscribed topics.  If a
-       schema was supplied when subscribing, the fields will be
-       formatted appropriately when the calling process is notified.
-       Else they will be strings.
-
-   * `{start}`
-
-       Starts up the background MQTT client (this should be called only once)
-
-   * `{status}`
-
-       Print (and return) a status summary for the MQTT client
-
-   * `{Option, Value}`
-   
-       Configure the startup connection to the broker, by supplying an
-       appropriate `{Option, Value}` tuple
-
-      For example to configure the module to establish a connection to
-      point to a host in AWS at port 8883, with relevant security,
-      when `mqtt:spawnClient()` is called, use:
-
-```erlang
-           mqtt:command([
-                {host,     "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"},
-                {port,     8883},
-                {capath,   "/path/to/my/cert/files"},
-                {cafile,   "root-CA.crt"},
-                {certfile, "riak-sink.cert.pem"},
-                {keyfile,  "riak-sink.private.key"}
-              ]).
-```
-
-
 <hr>
-### Example
+
+## Extended Examples
 
 Suppose you've previously started a mosquitto broker, as in:
 

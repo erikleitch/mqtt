@@ -33,20 +33,18 @@ namespace nifutil {
 class Mutex
 {
 protected:
-    pthread_mutex_t m_Mutex;
+    pthread_mutex_t mutex_;
 
 public:
-    Mutex() {pthread_mutex_init(&m_Mutex, NULL);};
+    Mutex() {pthread_mutex_init(&mutex_, NULL);};
 
-    ~Mutex() {pthread_mutex_destroy(&m_Mutex);};
+    ~Mutex() {pthread_mutex_destroy(&mutex_);};
 
-    pthread_mutex_t & get() {return(m_Mutex);};
+    pthread_mutex_t & get() {return(mutex_);};
 
-//    pthread_mutex_t * operator() {return(&m_Mutex);};
+    void lock() {pthread_mutex_lock(&mutex_);};
 
-    void Lock() {pthread_mutex_lock(&m_Mutex);};
-
-    void Unlock() {pthread_mutex_unlock(&m_Mutex);};
+    void unlock() {pthread_mutex_unlock(&mutex_);};
 
 private:
     Mutex(const Mutex & rhs);             // no copy
@@ -62,15 +60,15 @@ class MutexLock
 {
 protected:
 
-    Mutex & m_MutexObject;
+    Mutex & mutexObject_;
 
 public:
 
     explicit MutexLock(Mutex & MutexObject)
-        : m_MutexObject(MutexObject)
-    {m_MutexObject.Lock();};
+        : mutexObject_(MutexObject)
+    {mutexObject_.lock();};
 
-    ~MutexLock() {m_MutexObject.Unlock();};
+    ~MutexLock() {mutexObject_.unlock();};
 
 private:
 

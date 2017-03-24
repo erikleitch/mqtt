@@ -10,6 +10,8 @@
 #include "leveldb/slice.h"
 #endif
 
+#include "Mutex.h"
+
 /**
  * @file LevelManager.h
  * 
@@ -52,6 +54,7 @@ namespace nifutil {
 
     private:
 
+        Mutex mutex_;
         
 #if WITH_LEVELDB
         leveldb::DB* dbPtr_;

@@ -231,10 +231,10 @@ startCommsLoop(CallbackFn, false) ->
 %%-----------------------------------------------------------------------
 
 startCommsLoopRiak() ->
-    startCommsLoop([], fun mqtt:sendKvMsg/1, false).
+    startCommsLoop([], fun mqtt:sendTsMsg/1, false).
 
 startCommsLoopRiak(OptList) ->
-    startCommsLoop(OptList, fun mqtt:sendKvMsg/1, false).
+    startCommsLoop(OptList, fun mqtt:sendTsMsg/1, false).
     
 startCommsLoopRiakAlex() ->
     startCommsLoopRiak([
@@ -246,14 +246,17 @@ startCommsLoopRiakAlex() ->
 			{keyfile,  "riak-sink.private.key"}
 		       ]).
 
-sendKvMsg(Msg) ->
+sendTsMsg(MqttMsg) ->
+    {Topic, ValTuple} = MqttMsg,
+    TsMsg = {tsputreq, list_to_binary(Topic), [], [ValTuple]},
     State = {state,undefined,undefined,undefined,undefined},
-    Ret   = riak_kv_ts_svc:process(Msg, State),
+    io:format("About to put message: ~p~n", [TsMsg]),
+    Ret   = riak_kv_ts_svc:process(TsMsg, State),
     case Ret of
         {reply, {tsputresp}, State} ->
             ok;
         _ ->
-            io:format("MQTT Sent Msg = ~p Got Ret = ~p~n", [Msg, Ret])
+            io:format("MQTT Sent Msg = ~p Got Ret = ~p~n", [TsMsg, Ret])
     end.
 
 %%-----------------------------------------------------------------------
@@ -261,7 +264,7 @@ sendKvMsg(Msg) ->
 %%-----------------------------------------------------------------------
 
 startCommsLoopNone() ->
-    startCommsLoop(fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
+    startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
 
 %%-----------------------------------------------------------------------
 %% Comms loop that uses cert files and prints messages received from

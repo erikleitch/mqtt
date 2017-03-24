@@ -5,8 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/select.h>
+#include <sys/time.h>
 
 #include "ExceptionUtils.h"
+#include "String.h"
 
 using namespace std;
 
@@ -34,9 +36,12 @@ MosClient::MosClient()
     port_        = 1883;
     useCerts_    = false;
     keepAlive_   = 60;
-    embedded_    = false;
+    store_       = false;
     name_        = "mosclient";
 
+    initMicros_ = getCurrentMicroSeconds();
+    counter_    = 0;
+    
 #if WITH_ERL
     msgEnv_      = enif_alloc_env();
 #endif
@@ -115,13 +120,13 @@ void MosClient::initAndRun()
     mosquitto_subscribe_callback_set(mosq_, subscribe_callback);
 
     //------------------------------------------------------------
-    // Initialize DB if not running as embedded, and we are using
-    // leveldb
+    // Initialize DB if we were compiled with leveldb, and we are
+    // using leveldb
     //------------------------------------------------------------
 
 #if WITH_LEVELDB
-    if(!embedded_) {
-        std::string dbName_ = "/tmp/" + name_;
+    if(store_) {
+        dbName_ = "/tmp/" + name_;
         db_.open(dbName_);
     }
 #endif
@@ -331,6 +336,11 @@ std::string MosClient::getStatusSummary()
 void MosClient::toggleLogging(bool log)
 {
     ScopedLock(instance_.mutex_);
+    instance_.toggleLoggingPrivate(log);
+}
+
+void MosClient::toggleLoggingPrivate(bool log)
+{
     instance_.log_ = log;
 }
 
@@ -354,7 +364,7 @@ void MosClient::setOption(ErlNifEnv* env, std::string name, ERL_NIF_TERM val)
 
         setOption(name, ErlUtil::getValAsInt32(env, val));
 
-    } else if(name == "embedded") {
+    } else if(name == "store") {
         setOption(name, ErlUtil::getBool(env, val));
     } else {
         ThrowRuntimeError("Unrecognized option: " << name);
@@ -373,8 +383,8 @@ void MosClient::setOption(std::string name, bool val)
     if(instance_.mosCommsId_ != 0)
         ThrowRuntimeError("Connection options can't be changed once the comms loop has been started");
 
-    if(name == "embedded") {
-        instance_.embedded_ = val;
+    if(name == "store") {
+        instance_.store_ = val;
     } else {
         ThrowRuntimeError("Unrecognized option: " << name);
     }
@@ -502,6 +512,31 @@ ERL_NIF_TERM MosClient::formatForTs(const struct mosquitto_message* message)
 }
 
 /**.......................................................................
+ * Uses the schema supplied when the topic was subscribed to convert
+ * the data to an erlang tuple of converted terms
+ */
+ERL_NIF_TERM MosClient::formatForSchema(const struct mosquitto_message* message)
+{
+    //------------------------------------------------------------
+    // First the table name
+    //------------------------------------------------------------
+    
+    ERL_NIF_TERM topic   = enif_make_string(msgEnv_, (const char*)message->topic, ERL_NIF_LATIN1);
+
+    //------------------------------------------------------------
+    // Next the table data
+    //------------------------------------------------------------
+
+    ERL_NIF_TERM dataTuple = formatData(message);
+
+    //------------------------------------------------------------
+    // Finally, return a tuple from the array we just constructed
+    //------------------------------------------------------------
+    
+    return enif_make_tuple2(msgEnv_, topic, dataTuple);
+}
+
+/**.......................................................................
  * Format data encoded as a string
  */
 ERL_NIF_TERM MosClient::formatData(const struct mosquitto_message* message)
@@ -526,36 +561,49 @@ ERL_NIF_TERM MosClient::formatDataCsv(const struct mosquitto_message* message, T
     std::vector<STRING_CONV_FN_PTR>& convFnVec = topicDesc.convFnVec_;
     
     unsigned nTerm = convFnVec.size();
-    std::vector<ERL_NIF_TERM> dataTerms(nTerm);
-
-
-    const char* str = (const char*)message->payload;
-    
+    std::vector<ERL_NIF_TERM> dataTerms;
     std::ostringstream os;
-    
-    unsigned iTerm=0;
-    for(int i=0; i <= message->payloadlen; i++) {
+    const char* str = (const char*)message->payload;
         
-        if(i == message->payloadlen || str[i] == ',') {
-            if(iTerm < nTerm) {
-                dataTerms[iTerm] = convFnVec[iTerm](msgEnv_, os.str());
-                os.str("");
-                iTerm++;
+    if(nTerm > 0) {
+
+        dataTerms.resize(nTerm);
+        
+        unsigned iTerm=0;
+        for(int i=0; i <= message->payloadlen; i++) {
+            
+            if(i == message->payloadlen || str[i] == ',') {
+                if(iTerm < nTerm) {
+                    dataTerms[iTerm] = convFnVec[iTerm](msgEnv_, os.str());
+                    os.str("");
+                    iTerm++;
+                } else {
+                    ThrowRuntimeError("Invalid data received for schema " << message->topic << " (too many terms)"
+                                      << std::endl << "\r" << "  Expected CSV " << topicDesc.schema_);
+                }
             } else {
-                ThrowRuntimeError("Invalid data received for schema " << message->topic << " (too many terms)"
-                                  << std::endl << "\r" << "  Expected " << topicDesc.schema_);
+                os << str[i];
             }
-        } else {
-            os << str[i];
         }
         
+        // Did we convert enough terms?
+    
+        if(iTerm != nTerm)
+            ThrowRuntimeError("Invalid data received for schema " << message->topic << " (not enough terms)"
+                              << std::endl << "\r" << "  Expected CSV " << topicDesc.schema_);
+
+        // Else just process the message in toto as a single string
+        
+    } else {
+
+        nTerm = 1;
+        
+        for(int i=0; i < message->payloadlen; i++)
+            os << str[i];
+
+        dataTerms.resize(1);
+        dataTerms[0] = ErlUtil::stringToBinaryTerm(msgEnv_, os.str());
     }
-    
-    // Did we convert enough terms?
-    
-    if(iTerm != nTerm)
-        ThrowRuntimeError("Invalid data received for schema " << message->topic << " (not enough terms)"
-                          << std::endl << "\r" << "  Expected " << topicDesc.schema_);
     
     return enif_make_tuple_from_array(msgEnv_, &dataTerms[0], nTerm);
 }
@@ -602,7 +650,7 @@ ERL_NIF_TERM MosClient::formatDataJson(const struct mosquitto_message* message, 
                     iTerm++;
                 } else {
                     ThrowRuntimeError("Invalid data received for schema " << message->topic << " (too many terms)"
-                                      << std::endl << "\r" << "  Expected " << topicDesc.schema_);
+                                      << std::endl << "\r" << "  Expected JSON " << topicDesc.schema_);
                 }
             } else {
                 os << str[i];
@@ -615,7 +663,7 @@ ERL_NIF_TERM MosClient::formatDataJson(const struct mosquitto_message* message, 
     
     if(iTerm != nTerm)
         ThrowRuntimeError("Invalid data received for schema " << message->topic << " (not enough terms)"
-                          << std::endl << "\r" << "  Expected " << topicDesc.schema_);
+                          << std::endl << "\r" << "  Expected JSON " << topicDesc.schema_);
     
     return enif_make_tuple_from_array(msgEnv_, &dataTerms[0], nTerm);
 }
@@ -660,19 +708,23 @@ THREAD_START(MosClient::runMosCommsLoop)
 
     try {
         client->initAndRun();
+    } catch(std::runtime_error& err) {
+        COUTRED("MQTT Caught an error starting up comms loop: "
+                << std::endl << "\r" << err.what()
+                << std::endl << "\r" << " ... exiting");
     } catch(...) {
-
-        COUT("MQTT Caught an error starting up comms loop... exiting");
-        client->connected_ = false;
-
-        mosquitto_destroy(client->mosq_);
-        client->mosq_ = 0;
-        
-        mosquitto_lib_cleanup();
-
-        client->initialized_ = false;
+        COUTRED("MQTT Caught an unknown error starting up comms loop... exiting");
     }
-    
+
+    client->connected_ = false;
+
+    mosquitto_destroy(client->mosq_);
+    client->mosq_ = 0;
+        
+    mosquitto_lib_cleanup();
+
+    client->initialized_ = false;
+
     return 0;
 }
 
@@ -754,7 +806,8 @@ void MosClient::processMessage(const struct mosquitto_message *message)
         // Else process a normal message
 
     } else {
-        storeMessage(message);
+        if(store_)
+            storeMessage(message);
     }
 }
 
@@ -766,20 +819,19 @@ void MosClient::storeMessage(const struct mosquitto_message *message)
 #if WITH_LEVELDB
     // We assume CSV for now.  First field is the key, the topic is the 'bucket'
 
-    std::string str((const char*)message->payload, message->payloadlen);
-    size_t idx = str.find_first_of(',');
-    if(idx == std::string::npos) {
-        ThrowRuntimeError("Payload format should be 'key, content'");
-    }
+    std::string content((const char*)message->payload, message->payloadlen);
 
-    std::string bucket  = message->topic;
-    std::string key     = str.substr(0, idx);
+    std::string bucket = message->topic;
 
-    // Skip the comma to get to the start of the content
+    // Construct an internal key based on the start time of this
+    // thread and a monotonic counter.  The actual key is irrelevant
+    // -- it is just to ensure uniqueness for each record
     
-    std::string content = str.substr(idx+1, str.size() - (idx+1));
+    std::ostringstream key;
+    key << initMicros_ << counter_;
+    ++counter_;
 
-    db_.put(bucket + "_" + key, content);
+    db_.put(bucket + "_" + key.str(), content);
 #endif
 }
 
@@ -809,12 +861,29 @@ void MosClient::processCommand(const struct mosquitto_message *message)
         
         if(connected_) {
 
-            std::string topic = getEntry(entryMap, "topic");
-            
+            std::string       topic  = getEntry(entryMap, "topic");
+            gcp::util::String schema = getEntry(entryMap, "schema", "[varchar]");
+            std::string       format = getEntry(entryMap, "format", "csv");
+
+#if WITH_ERL
+            std::vector<STRING_CONV_FN_PTR> convFnVec;
+            gcp::util::String atom;
+            schema.advance(1);
+            do {
+                atom = schema.findNextStringSeparatedByChars("[,]");
+                if(!atom.isEmpty()) {
+                    atom.strip(' ');
+                    convFnVec.push_back(ErlUtil::getStringConvFn(atom.str()));
+                }
+            } while(!atom.isEmpty());
+
+            subscribe(topic, schema.str(), convFnVec, format);
+#else
             int retVal = mosquitto_subscribe(mosq_, NULL, entryMap["topic"].c_str(), 0);
 
             if(retVal != MOSQ_ERR_SUCCESS)
                 ThrowRuntimeError(formatMosError(retVal));
+#endif
         }
 
         //------------------------------------------------------------
@@ -824,11 +893,7 @@ void MosClient::processCommand(const struct mosquitto_message *message)
     } else if(command == "logging") {
 
         std::string value = getEntry(entryMap, "value");
-
-        if(value == "on" || value == "true")
-            log_ = true;
-        else
-            log_ = false;
+        toggleLoggingPrivate((value == "on" || value == "true"));
 
         //------------------------------------------------------------
         // Dump all stored messages to another broker
@@ -836,7 +901,7 @@ void MosClient::processCommand(const struct mosquitto_message *message)
 
     } else if(command == "dump") {
 
-        dumpToBroker(entryMap);
+        dumpToBrokerPrivate(entryMap);
 
     } else {
         ThrowRuntimeError("Unrecognized command: " << command);
@@ -869,6 +934,12 @@ std::string MosClient::getEntry(std::map<std::string, std::string>& entryMap, st
  */
 void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
 {
+    ScopedLock(instance_.mutex_);
+    instance_.dumpToBrokerPrivate(entryMap);
+}
+
+void MosClient::dumpToBrokerPrivate(std::map<std::string, std::string>& entryMap)
+{
 #if WITH_LEVELDB
     struct mosquitto* mosq = mosquitto_new(NULL, true, this);
 
@@ -880,18 +951,18 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
     unsigned delayms = toInt(getEntry(entryMap, "delayms", "0"));
                              
     int retVal=0;
+    
     retVal = mosquitto_connect(mosq, host.c_str(), port, keepAlive_);
 
     if(retVal != MOSQ_ERR_SUCCESS) {
         mosquitto_destroy(mosq);
         ThrowRuntimeError("Unable to connect");
-    } else {
-//        COUT("Successfully connected");
     }
 
     try {
+
         db_.iterStart();
-        
+
         std::string levelKey, levelVal;
 
         while(db_.iterValid()) {
@@ -928,16 +999,14 @@ void MosClient::dumpToBroker(std::map<std::string, std::string>& entryMap)
             db_.iterStep();
         }
         
-        db_.iterClose();
-
     } catch(std::runtime_error& err) {
         COUTRED("MQTT Caught an error while parsing dump message: " << std::endl << "\r  " << err.what());
     } catch(...) {
         COUT("MQTT Caught an unknown error while parsing dump message");
     }
 
-    mosquitto_destroy(mosq);
     db_.iterClose();
+    mosquitto_destroy(mosq);
 #endif
 }
 
@@ -953,6 +1022,7 @@ std::map<std::string, std::string> MosClient::decodeJson(const struct mosquitto_
     bool readTokens = false;
     std::ostringstream os;
     std::string field, value;
+    bool includeCommas=false;
     for(int i=0; i <= message->payloadlen; i++) {
 
         // Json tokens are colon-separated.  Until we encounter one,
@@ -960,7 +1030,6 @@ std::map<std::string, std::string> MosClient::decodeJson(const struct mosquitto_
         // chars.
         
         if(str[i] == ':') {
-
 
             readTokens = true;
             field = os.str();
@@ -973,11 +1042,20 @@ std::map<std::string, std::string> MosClient::decodeJson(const struct mosquitto_
             if(str[i] == '"')
                 continue;
 
+            // If this is an open brace, ignore commas until the close
+            // brace
+
+            if(str[i] == '[')
+                includeCommas=true;
+
+            if(includeCommas && str[i] == ']')
+                includeCommas=false;
+
             // If we hit a comma (next field), end of payload
             // (incorrectly formatted json), or closing brace (end of
             // json), we are done
             
-            if(i == message->payloadlen || str[i] == ',' || str[i] == '}') {
+            if(i == message->payloadlen || (!includeCommas && str[i] == ',') || str[i] == '}') {
 
                 readTokens = false;
                 value = os.str();
@@ -1041,14 +1119,15 @@ void MosClient::notify(const struct mosquitto_message *message)
         // If the topic isn't in our map, we can't format it for TS
         
         if(topicMap_.find(message->topic) == topicMap_.end()) {
+
             ERL_NIF_TERM topic   = enif_make_string(msgEnv_, (const char*)message->topic, ERL_NIF_LATIN1);
-            ERL_NIF_TERM payload = enif_make_string_len(msgEnv_, (const char*)message->payload, message->payloadlen, ERL_NIF_LATIN1);
+            ERL_NIF_TERM payload = enif_make_tuple1(msgEnv_, enif_make_string_len(msgEnv_, (const char*)message->payload, message->payloadlen, ERL_NIF_LATIN1));
             result = enif_make_tuple2(msgEnv_, topic, payload);
             
             // Else use the supplied schema to format the return message
             
         } else {
-            result = formatForTs(message);
+            result = formatForSchema(message);
         }
         
         //------------------------------------------------------------
@@ -1154,6 +1233,12 @@ std::string MosClient::getStatusSummaryPrivate()
         os << "   (none)" << std::endl << "\r";
     }
 
+#if WITH_LEVELDB
+    if(store_) {
+        os << std::endl << "\r" << "Using leveldb backing store: " << dbName_ << std::endl << "\r";
+    }
+#endif
+    
     os << NORM;
     
     return os.str();
@@ -1164,3 +1249,19 @@ void MosClient::blockForever()
     select(0, 0, 0, 0, 0);
 }
 
+int64_t MosClient::getCurrentMicroSeconds()
+{
+#if _POSIX_TIMERS >= 200801L
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return static_cast<uint64_t>(ts.tv_sec) * 1000000 + ts.tv_nsec/1000;
+
+#else
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
+
+#endif
+}

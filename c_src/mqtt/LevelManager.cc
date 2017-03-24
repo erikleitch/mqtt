@@ -45,7 +45,6 @@ void LevelManager::open(std::string dbName)
  */
 void LevelManager::close()
 {
-    COUT("Inside close");
 #if WITH_LEVELDB
     if(dbPtr_)
         delete dbPtr_;

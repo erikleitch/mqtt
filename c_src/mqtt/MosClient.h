@@ -61,12 +61,12 @@ namespace nifutil {
             
             ScopedLock(Mutex& mutex) {
                 mutex_ = &mutex;
-                mutex_->Lock();
+                mutex_->lock();
             };
             
             ~ScopedLock() {
                 if(mutex_)
-                    mutex_->Unlock();
+                    mutex_->unlock();
             };
             
         private:
@@ -115,7 +115,8 @@ namespace nifutil {
             
         static std::string getStatusSummary();
         static void toggleLogging(bool log);
-
+        static void dumpToBroker(std::map<std::string, std::string>& entryMap);
+        
 #if WITH_ERL
         static void subscribe(std::string topic, std::string schema, std::vector<STRING_CONV_FN_PTR> convFnVec, std::string format);
         static void registerPid(ErlNifEnv* env, ErlNifPid pid);
@@ -163,13 +164,17 @@ namespace nifutil {
         //------------------------------------------------------------
 
         LevelManager db_;
+        std::string dbName_;
+
         void storeMessage(const struct mosquitto_message *message);
         std::map<std::string, std::string> decodeJson(const struct mosquitto_message* message);
         int toInt(std::string str);
-        void dumpToBroker(std::map<std::string, std::string>& entryMap);
 
         std::string getEntry(std::map<std::string, std::string>& entryMap, std::string entry);
         std::string getEntry(std::map<std::string, std::string>& entryMap, std::string defVal, std::string entry);
+
+        void toggleLoggingPrivate(bool log);
+        void dumpToBrokerPrivate(std::map<std::string, std::string>& entryMap);
 
 #if WITH_ERL
         //------------------------------------------------------------
@@ -180,6 +185,7 @@ namespace nifutil {
         void subscribePrivate(std::string topic, std::string schema, std::vector<STRING_CONV_FN_PTR> convFnVec, std::string format);
 
         ERL_NIF_TERM formatForTs(const struct mosquitto_message* message);
+        ERL_NIF_TERM formatForSchema(const struct mosquitto_message* message);
         ERL_NIF_TERM formatData(const struct mosquitto_message* message);
         ERL_NIF_TERM formatDataCsv(const struct mosquitto_message* message, Topic& topicDesc);
         ERL_NIF_TERM formatDataJson(const struct mosquitto_message* message, Topic& topicDesc);
@@ -194,6 +200,8 @@ namespace nifutil {
         void logMessage(const struct mosquitto_message *message);
         static std::string formatMessage(const struct mosquitto_message *message);
 
+        int64_t getCurrentMicroSeconds();
+
         // Private members of this class
         
         pthread_t mosCommsId_;
@@ -203,7 +211,7 @@ namespace nifutil {
         bool initialized_;
         bool log_;
         int port_;
-        bool embedded_; // Are we being used standalone, or embedded?
+        bool store_; // Should we store messages internally?
         std::string name_;
         std::string host_;
         std::string caPath_;
@@ -217,6 +225,8 @@ namespace nifutil {
         
         std::list<std::string> topicList_;
 
+        unsigned counter_;
+        unsigned initMicros_;
 
         Mutex mutex_;
 
