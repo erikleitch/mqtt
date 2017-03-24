@@ -26,7 +26,7 @@
 	 startCommsLoopRiak/1, 
 	 startCommsLoopRiakAlex/0, 
 	 startCommsLoopNoneAlex/0, 
-	 startCommsLoopNone/0, 
+	 startCommsLoopPrint/0, 
 	 startCommsLoopFake/0]).
 
 -compile([export_all]).
@@ -263,7 +263,7 @@ sendTsMsg(MqttMsg) ->
 %% Test comms loop that just prints messages as they come in 
 %%-----------------------------------------------------------------------
 
-startCommsLoopNone() ->
+startCommsLoopPrint() ->
     startCommsLoop([{store, true}], fun(Msg) -> io:format("Received message: ~p~n", [Msg]) end, false).
 
 %%-----------------------------------------------------------------------

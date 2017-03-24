@@ -132,7 +132,7 @@ Recognized commands are:
 	    If specified as json, mqtt expects string messages to be formatted as json: `{"name1":val1, "name2":val2, "name3":val3}`
 
         For example, to subscribe to topic "GeoCheckin", whose messages are expected
-        to be of the format: "mystring, 100012, 3, 1.234, false"
+        to be of the format: "mystring, 100012, 3, 1.234, false":
 
 ```erlang
 	   mqtt:command({subscribe, "GeoCheckin", [varchar, timestamp, sint64, double, boolean], csv})
@@ -183,15 +183,15 @@ Recognized commands are:
        
        Connection specs:
        
-       * `host` - broker to connect to, e.g. "a1e72kiiddbupq.iot.us-east-1.amazonaws.com"
-       * `port` - broker port to connect to, e.g. 8883},
+       * `host` - broker to connect to, e.g., `"a1e72kiiddbupq.iot.us-east-1.amazonaws.com"`
+       * `port` - broker port to connect to, e.g., `8883`,
 
        Connection security
 
-       * `capath` - path to certificate authority files, e.g. "/path/to/my/cert/files"
-       * `cafile` - root certificate file, e.g. "root-CA.crt"
-       * `certfile` - certificate file, e.g. "riak-sink.cert.pem"},
-       * `keyfile` - keyfile, "riak-sink.private.key"
+       * `capath` - path to certificate authority files, e.g., `"/path/to/my/cert/files"`
+       * `cafile` - root certificate file, e.g., `"root-CA.crt"`
+       * `certfile` - certificate file, e.g., `"riak-sink.cert.pem"`
+       * `keyfile` - keyfile, e.g., `"riak-sink.private.key"`
 
 For example to configure the module to establish a connection to
        point to a host in AWS at port 8883, with relevant security,
@@ -210,19 +210,91 @@ For example to configure the module to establish a connection to
 
 <hr>
 
+## Erlang Example:
+
+Suppose you've previously started a mosquitto broker, as in:
+
+```mosquitto -c /usr/local/etc/mosquitto/mosquitto.conf```
+
+You can start up an erlang shell, and initialize the comms loop, like:
+
+```erlang
+Erlang R16B02_basho8 (erts-5.10.3) [source] [64-bit] [smp:8:8] [async-threads:10] [hipe] [kernel-poll:false]
+
+Eshell V5.10.3  (abort with ^G)
+1> mqtt:startCommsLoopPrint().
+
+For information on supported commands, use mqtt:command({help})
+
+   <0.38.0>
+   MQTT Attempting to reconnect...
+   MQTT Successfully connected
+   MQTT Subscribed (mid: 1) 0
+
+2> mqtt:command({subscribe, test, [varchar, double], csv}).
+ok
+MQTT Subscribed (mid: 2) 0
+```
+
+Subsequently publishing data to the broker on a subscribed topic will
+now cause your erlang shell to print the messages as they are
+received.  For example
+
+```
+mosquitto_pub -t "test" -m "val1, 1.234"
+```
+issued from a shell will produce:
+
+```
+Received message: {"test",{<<"val1">>,1.234}}
+```
+
+As you can see, because the MQTT message has a known schema, the
+fields in the message returned to erlang have already been formatted
+by type.
+
+You can subscribe to additional topics at any time.  For example if
+you typed
+
+```
+3> mqtt:command({subscribe, "test2"}).
+ok
+MQTT Subscribed (mid: 3) 0
+```
+
+(note that the command interface is generally lenient as to type) then
+publishing data to the broker on the new topic, like:
+
+```mosquitto_pub -t "test2" -m "val2, 1.235"```
+
+will now cause the new messages to be received in erlang:
+
+```
+Received message: {"test2",{<<"val1, 1.235">>}}
+```
+
+Note that because no schema was supplied on subscription, no
+formatting is applied, and the entirely of the message is returned as
+an erlang binary.
+
+<hr>
 ## MQTT Example
 
-For example, to tell the default client to subscribe to a new topic `newtopic`:
+In the example above, new topics were subscribed to by configuring the
+client from erlang.  You can also configure the client via the MQTT
+interface.
+
+For example, to tell the default client to subscribe to a new topic `test`:
 
 ```
-mosquitto_pub -t "mosclient/command" -m "{command:subscribe, topic:newtopic}"
+mosquitto_pub -t "mosclient/command" -m "{command:subscribe, topic:test, schema:[varchar, double]}"
 ```
 
-Messages subsequently sent to `newtopic` will be processed by the
-client.
+Messages subsequently sent to `test` will be processed by the client
+as before.
 
-If using with leveldb, CSV messages of the form `"key, content"` will
-be stored in a leveldb instance, indexed by key. 
+If using with leveldb, messages will also be stored in a leveldb
+instance.
 
 If messages are being stored, you can replay them to another broker by
 sending a message like:
@@ -234,68 +306,3 @@ mosquitto_pub -t "mosclient/command" -m "{command:dump, host:localhost, port:188
 this would cause stored messages to be replayed to a local broker
 listening on port 1884, with a 1-ms delay between publishing each key
 (some brokers cannot be published to as fast as clients can write).
-
-<hr>
-
-## Extended Examples
-
-Suppose you've previously started a mosquitto broker, as in:
-
-```mosquitto -c /usr/local/etc/mosquitto/mosquitto.conf```
-
-You can start up an erlang shell, and initialize the comms loop, like:
-
-```
-Erlang R16B02_basho8 (erts-5.10.3) [source] [64-bit] [smp:8:8] [async-threads:10] [hipe] [kernel-poll:false]
-
-Eshell V5.10.3  (abort with ^G)
-1> mqtt:startCommsLoopNone().
-<0.41.0>
-Attempting to reconnect...
-Successfully connected
-Subscribing to topic DeviceData
-Subscribing to topic GeoCheckin
-Subscribed (mid: 1) 2
-Subscribed (mid: 2) 2
-```
-
-Subsequently publishing data to the broker on a subscribed topic will
-now cause your erlang shell to print the messages as they are
-received.  For example
-
-```
-mosquitto_pub -t "GeoCheckin" -m "familyMqtt,seriesMqtt,$iIter,1,binval,1.234,true"
-```
-issued from a shell will produce:
-
-```
-                  Received message: {tsputreq,<<"GeoCheckin">>,[],
-                              [{<<"familyMqtt">>,<<"seriesMqtt">>,30,1,
-                                <<"binval">>,1.234,true}]}
-2>
-```
-
-As you can see, because the MQTT message has a known schema, the
-message returned to erlang has already been correctly formatted for
-handoff to TS.
-
-You can subscribe to additional topics at any time.  For example if
-you typed
-
-```
-2> mqtt:command({subscribe, "Test", [varchar]}).
-ok
-Subscribed (mid: 3)
-```
-
-then publishing data to the broker on the new topic, like
-
-```mosquitto_pub -t "Test" -m "this is a test"```
-
-will now cause the new messages to be received in erlang:
-
-```
-                  Received message: {tsputreq,<<"Test">>,[],[{<<"this is a test">>}]}
-3>
-```
-		  
